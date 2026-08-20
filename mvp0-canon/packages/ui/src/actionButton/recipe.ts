@@ -80,6 +80,18 @@ export const actionButtonRecipe = defineSlotRecipe({
           color: "actionButton.error.fg",
         },
       },
+      retrying: {
+        root: {
+          backgroundColor: "actionButton.retrying.bg",
+          borderColor: "actionButton.retrying.border",
+        },
+        label: {
+          color: "actionButton.retrying.fg",
+        },
+        indicator: {
+          color: "actionButton.retrying.fg",
+        },
+      },
       disabled: {
         root: {
           backgroundColor: "actionButton.disabled.bg",

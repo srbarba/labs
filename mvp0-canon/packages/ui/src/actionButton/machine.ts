@@ -36,8 +36,14 @@ export const actionButtonMachine = createMachine({
     },
     error: {
       on: {
-        CLICK: { target: "pending" },
+        CLICK: { target: "retrying" },
         DISMISS: { target: "idle" },
+      },
+    },
+    retrying: {
+      on: {
+        RESOLVE: { target: "success" },
+        REJECT: { target: "error" },
       },
     },
     disabled: {

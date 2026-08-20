@@ -11,6 +11,7 @@
     { "name": "pending", "description": "Acción en curso" },
     { "name": "success", "description": "Acción completada, con auto-retorno temporizado" },
     { "name": "error", "description": "Acción fallida, permite reintento" },
+    { "name": "retrying", "description": "Reintento en curso tras un fallo previo" },
     { "name": "disabled", "description": "No interactivo por decisión del consumidor" }
   ],
   "transitions": [
@@ -18,8 +19,10 @@
     { "from": "pending", "event": "RESOLVE", "to": "success" },
     { "from": "pending", "event": "REJECT", "to": "error" },
     { "from": "success", "event": "AFTER", "to": "idle", "delay": "successDuration" },
-    { "from": "error", "event": "CLICK", "to": "pending" },
+    { "from": "error", "event": "CLICK", "to": "retrying" },
     { "from": "error", "event": "DISMISS", "to": "idle" },
+    { "from": "retrying", "event": "RESOLVE", "to": "success" },
+    { "from": "retrying", "event": "REJECT", "to": "error" },
     { "from": "idle", "event": "DISABLE", "to": "disabled" },
     { "from": "disabled", "event": "ENABLE", "to": "idle" }
   ],
@@ -60,6 +63,11 @@
       "root": { "backgroundColor": "color.actionButton.disabled.bg", "borderColor": "color.actionButton.disabled.border" },
       "label": { "color": "color.actionButton.disabled.fg" },
       "indicator": { "color": "color.actionButton.disabled.fg" }
+    },
+    "retrying": {
+      "root": { "backgroundColor": "color.actionButton.retrying.bg", "borderColor": "color.actionButton.retrying.border" },
+      "label": { "color": "color.actionButton.retrying.fg" },
+      "indicator": { "color": "color.actionButton.retrying.fg" }
     }
   },
   "a11y": {
@@ -70,7 +78,8 @@
       "pending": "retain",
       "success": "retain",
       "error": "retain",
-      "disabled": "none"
+      "disabled": "none",
+      "retrying": "retain"
     },
     "keyboard": {
       "Enter": "CLICK",

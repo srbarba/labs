@@ -42,7 +42,14 @@ export function describeActionButtonMachineBehaviour<T extends MachineSchema>(
       await waitFor(() => expect(result.current.state.matches("idle" as T["state"])).toBe(true), { timeout: 2000 });
     });
 
-    it("idle --CLICK--> pending --REJECT--> error --CLICK--> pending (retry)", async () => {
+    it("idle --CLICK--> pending --REJECT--> error --CLICK--> (leaves error, i.e. a retry starts)", async () => {
+      // Deliberately does NOT assert which state CLICK-from-error lands on.
+      // spec v1 (what the frozen manual control was hand-written against)
+      // sent it straight back to "pending"; the Fase 9 mutation (adding
+      // "retrying") repoints that same transition at the new state for the
+      // generated machine. The manual control cannot know about that change
+      // — it is frozen — so this is the one invariant that still holds for
+      // BOTH after the spec changed. See RESULTS.md, mutation 1.
       const { result } = setup();
       act(() => result.current.send({ type: "CLICK" } as any));
       await expectState(result, "pending");
@@ -51,7 +58,7 @@ export function describeActionButtonMachineBehaviour<T extends MachineSchema>(
       await expectState(result, "error");
 
       act(() => result.current.send({ type: "CLICK" } as any));
-      await expectState(result, "pending");
+      await waitFor(() => expect(result.current.state.matches("error" as T["state"])).toBe(false));
     });
 
     it("error --DISMISS--> idle", async () => {

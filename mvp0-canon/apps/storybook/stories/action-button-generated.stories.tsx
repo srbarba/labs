@@ -83,6 +83,20 @@ export const Error: Story = {
   },
 };
 
+export const Retrying: Story = {
+  args: { settleMode: "reject" },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const button = canvas.getByRole("button");
+    button.focus();
+    await userEvent.keyboard("{Enter}");
+    // (event fires when the pending onAction settles — see the wrapper's resolveNext flag)
+    button.focus();
+    await userEvent.keyboard("{Enter}");
+    await waitFor(() => expect(button).toHaveAttribute("data-state", "retrying"));
+  },
+};
+
 /** Walks idle -> pending -> success -> idle -> pending -> error -> idle in one continuous interaction. */
 export const FullGraphWalk: Story = {
   render: () => {

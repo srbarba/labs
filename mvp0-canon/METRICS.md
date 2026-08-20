@@ -94,3 +94,7 @@ Registro incremental por fase. Se consolida en `RESULTS.md` en la Fase 9.
 - `pnpm run check:no-manual-edits` (para CI): regenera y falla si `packages/ui/`, la story o el test generados difieren de lo committeado — ahora cubre los tres destinos generados, no solo `packages/ui/` como en el borrador inicial del script.
 - `.gitattributes`: marca los tres destinos generados como `linguist-generated=true`.
 - CODEOWNERS: no se añadió. El fichero viviría en la raíz real del repositorio (`/`, fuera de `mvp0-canon/`), que también contiene el proyecto `vuetify-testing-utils` no relacionado con este MVP, y requeriría un equipo/revisor real de GitHub que no existe en este contexto — habría sido un placeholder sin efecto verificable. El hook de pre-commit ya cumple el criterio de salida literal ("editar a mano un fichero generado y hacer commit falla"), probado empíricamente arriba; CODEOWNERS habría sido una capa adicional de gobierno de PR, no una necesidad para este MVP.
+
+## Fase 9 — Experimento de falsación
+
+Ver `RESULTS.md` en la raíz de `mvp0-canon/` para la tabla completa, el veredicto y el análisis de "qué no cupo en la especificación". Resumen: las 4 mutaciones se ejecutaron de verdad contra el repositorio (no simuladas) — añadir el estado `retrying`, cambiar un token de color, editar a mano un fichero generado, y comparar la suite compartida entre control y generado — con veredicto **go**.

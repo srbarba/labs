@@ -6,7 +6,7 @@ import { actionButton as actionButtonRecipe } from "styled-system/recipes";
 import { actionButtonMachine } from "./machine";
 import type { ActionButtonSchema } from "./types";
 
-const STATES = ["idle", "pending", "success", "error", "disabled"] as const;
+const STATES = ["idle", "pending", "success", "error", "retrying", "disabled"] as const;
 
 const KEYBOARD_MAP: Record<string, string> = {
   "Enter": "CLICK",

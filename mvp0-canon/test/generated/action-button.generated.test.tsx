@@ -33,12 +33,12 @@ describe("ActionButton (generated) — valid transitions", () => {
     await waitFor(() => expect(result.current.state.matches("error" as any)).toBe(true));
   });
 
-  it("[valid #3] error --CLICK--> pending", async () => {
+  it("[valid #3] error --CLICK--> retrying", async () => {
     const { result } = renderHook(() => useMachine(actionButtonMachine, { successDuration: 500 } as any));
       act(() => result.current.send({ type: "CLICK" } as any));
       act(() => result.current.send({ type: "REJECT" } as any));
     act(() => result.current.send({ type: "CLICK" } as any));
-    await waitFor(() => expect(result.current.state.matches("pending" as any)).toBe(true));
+    await waitFor(() => expect(result.current.state.matches("retrying" as any)).toBe(true));
   });
 
   it("[valid #4] error --DISMISS--> idle", async () => {
@@ -49,14 +49,32 @@ describe("ActionButton (generated) — valid transitions", () => {
     await waitFor(() => expect(result.current.state.matches("idle" as any)).toBe(true));
   });
 
-  it("[valid #5] idle --DISABLE--> disabled", async () => {
+  it("[valid #5] retrying --RESOLVE--> success", async () => {
+    const { result } = renderHook(() => useMachine(actionButtonMachine, { successDuration: 500 } as any));
+      act(() => result.current.send({ type: "CLICK" } as any));
+      act(() => result.current.send({ type: "REJECT" } as any));
+      act(() => result.current.send({ type: "CLICK" } as any));
+    act(() => result.current.send({ type: "RESOLVE" } as any));
+    await waitFor(() => expect(result.current.state.matches("success" as any)).toBe(true));
+  });
+
+  it("[valid #6] retrying --REJECT--> error", async () => {
+    const { result } = renderHook(() => useMachine(actionButtonMachine, { successDuration: 500 } as any));
+      act(() => result.current.send({ type: "CLICK" } as any));
+      act(() => result.current.send({ type: "REJECT" } as any));
+      act(() => result.current.send({ type: "CLICK" } as any));
+    act(() => result.current.send({ type: "REJECT" } as any));
+    await waitFor(() => expect(result.current.state.matches("error" as any)).toBe(true));
+  });
+
+  it("[valid #7] idle --DISABLE--> disabled", async () => {
     const { result } = renderHook(() => useMachine(actionButtonMachine, { successDuration: 500 } as any));
 
     act(() => result.current.send({ type: "DISABLE" } as any));
     await waitFor(() => expect(result.current.state.matches("disabled" as any)).toBe(true));
   });
 
-  it("[valid #6] disabled --ENABLE--> idle", async () => {
+  it("[valid #8] disabled --ENABLE--> idle", async () => {
     const { result } = renderHook(() => useMachine(actionButtonMachine, { successDuration: 500 } as any));
       act(() => result.current.send({ type: "DISABLE" } as any));
     act(() => result.current.send({ type: "ENABLE" } as any));
@@ -228,6 +246,46 @@ describe("ActionButton (generated) — invalid transitions are no-ops", () => {
     expect(result.current.state.matches("error" as any)).toBe(true);
   });
 
+  it("[invalid] CLICK in retrying is a no-op", async () => {
+    const { result } = renderHook(() => useMachine(actionButtonMachine, { successDuration: 5000 } as any));
+      act(() => result.current.send({ type: "CLICK" } as any));
+      act(() => result.current.send({ type: "REJECT" } as any));
+      act(() => result.current.send({ type: "CLICK" } as any));
+    act(() => result.current.send({ type: "CLICK" } as any));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(result.current.state.matches("retrying" as any)).toBe(true);
+  });
+
+  it("[invalid] DISMISS in retrying is a no-op", async () => {
+    const { result } = renderHook(() => useMachine(actionButtonMachine, { successDuration: 5000 } as any));
+      act(() => result.current.send({ type: "CLICK" } as any));
+      act(() => result.current.send({ type: "REJECT" } as any));
+      act(() => result.current.send({ type: "CLICK" } as any));
+    act(() => result.current.send({ type: "DISMISS" } as any));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(result.current.state.matches("retrying" as any)).toBe(true);
+  });
+
+  it("[invalid] DISABLE in retrying is a no-op", async () => {
+    const { result } = renderHook(() => useMachine(actionButtonMachine, { successDuration: 5000 } as any));
+      act(() => result.current.send({ type: "CLICK" } as any));
+      act(() => result.current.send({ type: "REJECT" } as any));
+      act(() => result.current.send({ type: "CLICK" } as any));
+    act(() => result.current.send({ type: "DISABLE" } as any));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(result.current.state.matches("retrying" as any)).toBe(true);
+  });
+
+  it("[invalid] ENABLE in retrying is a no-op", async () => {
+    const { result } = renderHook(() => useMachine(actionButtonMachine, { successDuration: 5000 } as any));
+      act(() => result.current.send({ type: "CLICK" } as any));
+      act(() => result.current.send({ type: "REJECT" } as any));
+      act(() => result.current.send({ type: "CLICK" } as any));
+    act(() => result.current.send({ type: "ENABLE" } as any));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(result.current.state.matches("retrying" as any)).toBe(true);
+  });
+
   it("[invalid] CLICK in disabled is a no-op", async () => {
     const { result } = renderHook(() => useMachine(actionButtonMachine, { successDuration: 5000 } as any));
       act(() => result.current.send({ type: "DISABLE" } as any));
@@ -308,6 +366,18 @@ describe("ActionButton (generated) — accessibility per state", () => {
     act(() => ref.current?.send({ type: "CLICK" } as any));
     act(() => ref.current?.send({ type: "REJECT" } as any));
     await waitFor(() => expect(container.querySelector("[data-state=\"error\"]")).not.toBeNull());
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+
+  it("[a11y] retrying has no obvious accessibility violations", async () => {
+    const ref = { current: null as ActionButtonHandle | null };
+    const { container } = render(<ActionButton ref={ref} successDuration={5000}>Save</ActionButton>);
+    await waitFor(() => expect(ref.current).not.toBeNull());
+    act(() => ref.current?.send({ type: "CLICK" } as any));
+    act(() => ref.current?.send({ type: "REJECT" } as any));
+    act(() => ref.current?.send({ type: "CLICK" } as any));
+    await waitFor(() => expect(container.querySelector("[data-state=\"retrying\"]")).not.toBeNull());
     const results = await axe(container);
     expect(results).toHaveNoViolations();
   });

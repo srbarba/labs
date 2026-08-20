@@ -15,7 +15,7 @@ export interface ActionButtonSchema {
   };
   refs: Record<string, never>;
   computed: Record<string, never>;
-  state: "idle" | "pending" | "success" | "error" | "disabled";
+  state: "idle" | "pending" | "success" | "error" | "retrying" | "disabled";
   tag: never;
   guard: "notDisabled";
   action: never;

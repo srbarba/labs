@@ -58,6 +58,17 @@ export const actionButtonTokens = {
         "border": {
           "value": "#e5e7eb"
         }
+      },
+      "retrying": {
+        "bg": {
+          "value": "#f59e0b"
+        },
+        "fg": {
+          "value": "#ffffff"
+        },
+        "border": {
+          "value": "#f59e0b"
+        }
       }
     }
   },

@@ -8,7 +8,7 @@
   },
   "scripts": {
     "verify": "pnpm --filter @mvp0/compiler run verify",
-    "generate": "pnpm --filter @mvp0/compiler run generate",
+    "generate": "pnpm --filter @mvp0/compiler run generate && panda codegen",
     "build": "pnpm run generate && pnpm --filter @mvp0/ui run typecheck",
     "test": "vitest run",
     "typecheck": "pnpm -r run typecheck && tsc --noEmit -p test",
