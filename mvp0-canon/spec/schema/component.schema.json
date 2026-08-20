@@ -1,0 +1,256 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "anatomy": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+          },
+          "element": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "element"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "states": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "initial": {
+            "default": false,
+            "type": "boolean"
+          },
+          "final": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "initial",
+          "final"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "transitions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+          },
+          "event": {
+            "type": "string",
+            "minLength": 1
+          },
+          "to": {
+            "type": "string",
+            "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+          },
+          "guard": {
+            "type": "string"
+          },
+          "delay": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "event",
+          "to"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "events": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "payload": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "context": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          },
+          "default": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "default"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "visual": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+        },
+        "additionalProperties": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "enum": [
+              "backgroundColor",
+              "color",
+              "borderColor"
+            ]
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[a-zA-Z][a-zA-Z0-9.]*$"
+          }
+        }
+      }
+    },
+    "a11y": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ariaLive": {
+          "type": "string",
+          "enum": [
+            "off",
+            "polite",
+            "assertive"
+          ]
+        },
+        "focusBehaviour": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "enum": [
+              "retain",
+              "move-to-root",
+              "none"
+            ]
+          }
+        },
+        "keyboard": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "role",
+        "focusBehaviour",
+        "keyboard"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "name",
+    "version",
+    "anatomy",
+    "states",
+    "transitions",
+    "events",
+    "context",
+    "visual",
+    "a11y"
+  ],
+  "additionalProperties": false
+}

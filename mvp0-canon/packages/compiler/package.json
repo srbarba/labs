@@ -6,11 +6,11 @@
   "scripts": {
     "verify": "tsx src/index.ts verify",
     "generate": "tsx src/index.ts generate",
+    "schema:json": "tsx src/schema-json.ts",
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
-    "zod": "4.4.3",
-    "zod-to-json-schema": "3.25.2"
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@types/node": "26.2.0",
