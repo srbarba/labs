@@ -12,7 +12,7 @@
     "build": "pnpm run generate && pnpm --filter @mvp0/ui run typecheck",
     "test": "vitest run",
     "typecheck": "pnpm -r run typecheck && tsc --noEmit -p test",
-    "check:no-manual-edits": "pnpm run generate && git diff --exit-code -- packages/ui apps/storybook/stories/action-button-generated.stories.tsx test/generated/action-button.generated.test.tsx",
+    "check:no-manual-edits": "pnpm run generate && git diff --exit-code -- packages/ui \":(glob)apps/storybook/stories/*-generated.stories.tsx\" \":(glob)test/generated/*.generated.test.tsx\"",
     "hooks:install": "git config core.hooksPath mvp0-canon/.githooks"
   },
   "devDependencies": {

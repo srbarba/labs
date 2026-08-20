@@ -330,7 +330,7 @@ describe("ActionButton (generated) — invalid transitions are no-ops", () => {
 describe("ActionButton (generated) — accessibility per state", () => {
   it("[a11y] idle has no obvious accessibility violations", async () => {
     const ref = { current: null as ActionButtonHandle | null };
-    const { container } = render(<ActionButton ref={ref} successDuration={5000}>Save</ActionButton>);
+    const { container } = render(<ActionButton ref={ref} successDuration={999999}>Save</ActionButton>);
     await waitFor(() => expect(ref.current).not.toBeNull());
 
     await waitFor(() => expect(container.querySelector("[data-state=\"idle\"]")).not.toBeNull());
@@ -340,7 +340,7 @@ describe("ActionButton (generated) — accessibility per state", () => {
 
   it("[a11y] pending has no obvious accessibility violations", async () => {
     const ref = { current: null as ActionButtonHandle | null };
-    const { container } = render(<ActionButton ref={ref} successDuration={5000}>Save</ActionButton>);
+    const { container } = render(<ActionButton ref={ref} successDuration={999999}>Save</ActionButton>);
     await waitFor(() => expect(ref.current).not.toBeNull());
     act(() => ref.current?.send({ type: "CLICK" } as any));
     await waitFor(() => expect(container.querySelector("[data-state=\"pending\"]")).not.toBeNull());
@@ -350,7 +350,7 @@ describe("ActionButton (generated) — accessibility per state", () => {
 
   it("[a11y] success has no obvious accessibility violations", async () => {
     const ref = { current: null as ActionButtonHandle | null };
-    const { container } = render(<ActionButton ref={ref} successDuration={5000}>Save</ActionButton>);
+    const { container } = render(<ActionButton ref={ref} successDuration={999999}>Save</ActionButton>);
     await waitFor(() => expect(ref.current).not.toBeNull());
     act(() => ref.current?.send({ type: "CLICK" } as any));
     act(() => ref.current?.send({ type: "RESOLVE" } as any));
@@ -361,7 +361,7 @@ describe("ActionButton (generated) — accessibility per state", () => {
 
   it("[a11y] error has no obvious accessibility violations", async () => {
     const ref = { current: null as ActionButtonHandle | null };
-    const { container } = render(<ActionButton ref={ref} successDuration={5000}>Save</ActionButton>);
+    const { container } = render(<ActionButton ref={ref} successDuration={999999}>Save</ActionButton>);
     await waitFor(() => expect(ref.current).not.toBeNull());
     act(() => ref.current?.send({ type: "CLICK" } as any));
     act(() => ref.current?.send({ type: "REJECT" } as any));
@@ -372,7 +372,7 @@ describe("ActionButton (generated) — accessibility per state", () => {
 
   it("[a11y] retrying has no obvious accessibility violations", async () => {
     const ref = { current: null as ActionButtonHandle | null };
-    const { container } = render(<ActionButton ref={ref} successDuration={5000}>Save</ActionButton>);
+    const { container } = render(<ActionButton ref={ref} successDuration={999999}>Save</ActionButton>);
     await waitFor(() => expect(ref.current).not.toBeNull());
     act(() => ref.current?.send({ type: "CLICK" } as any));
     act(() => ref.current?.send({ type: "REJECT" } as any));
@@ -384,7 +384,7 @@ describe("ActionButton (generated) — accessibility per state", () => {
 
   it("[a11y] disabled has no obvious accessibility violations", async () => {
     const ref = { current: null as ActionButtonHandle | null };
-    const { container } = render(<ActionButton ref={ref} successDuration={5000}>Save</ActionButton>);
+    const { container } = render(<ActionButton ref={ref} successDuration={999999}>Save</ActionButton>);
     await waitFor(() => expect(ref.current).not.toBeNull());
     act(() => ref.current?.send({ type: "DISABLE" } as any));
     await waitFor(() => expect(container.querySelector("[data-state=\"disabled\"]")).not.toBeNull());

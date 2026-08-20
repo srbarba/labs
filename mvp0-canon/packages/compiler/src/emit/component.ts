@@ -1,11 +1,20 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import type { ComponentSpec } from "../../../../spec/schema/component.schema.js";
+import type { ComponentSpec, SlotFillValue } from "../../../../spec/schema/component.schema.js";
 import { GENERATED_HEADER, pascalCase } from "../naming.js";
 
-const SPEC_PATH = "spec/components/action-button.spec.json";
+function slotFillExpression(fill: SlotFillValue): string {
+  switch (fill.kind) {
+    case "text":
+      return JSON.stringify(fill.value);
+    case "children":
+      return "children";
+    case "contextRef":
+      return fill.field;
+  }
+}
 
-export function emitComponent(spec: ComponentSpec, outDir: string): void {
+export function emitComponent(spec: ComponentSpec, outDir: string, filePath: string): void {
   const componentDir = path.join(outDir, "src", spec.name);
   mkdirSync(componentDir, { recursive: true });
 
@@ -15,29 +24,79 @@ export function emitComponent(spec: ComponentSpec, outDir: string): void {
   if (!rootPart) {
     throw new Error(`emitComponent: anatomy has no part named "root" — the compiler needs one interactive part by convention.`);
   }
-  const indicatorPart = spec.anatomy.find((p) => p.name === "indicator");
+  if (!rootPart.element) {
+    throw new Error(
+      `emitComponent: "root" must be a native element, not a component reference (${filePath}) — this should have been rejected by verifyComposition's root-part-native rule before generation.`,
+    );
+  }
+  const indicatorPart = spec.anatomy.find((p) => p.name === "indicator" && p.element !== undefined);
   const liveRegionPart = indicatorPart ?? rootPart;
+
+  // Legacy convention, preserved only so pre-existing specs (action-button)
+  // don't need to change: an anatomy part literally named "label" with no
+  // explicit contentSlot still gets the component's `children` prop. Any
+  // NEW spec that wants projected content declares `contentSlot` instead.
+  const legacyLabelPart = spec.anatomy.find((p) => p.name === "label" && p.element !== undefined && p.contentSlot === undefined);
+  const contentSlotParts = spec.anatomy.filter((p) => p.contentSlot !== undefined);
+  const componentParts = spec.anatomy.filter((p) => p.component !== undefined);
+  const usesChildrenForward = componentParts.some((p) => Object.values(p.slotFill ?? {}).some((f) => f.kind === "children"));
+  const needsChildrenProp = legacyLabelPart !== undefined || usesChildrenForward;
 
   const keyboardEntries = Object.entries(spec.a11y.keyboard)
     .map(([key, eventName]) => `  ${JSON.stringify(key)}: ${JSON.stringify(eventName)},`)
     .join("\n");
 
+  const nestedImports = [...new Set(componentParts.map((p) => p.component!))]
+    .map((name) => `import { ${pascalCase(name)} } from "../${name}/${name}";`)
+    .join("\n");
+  const nestedImportsLine = nestedImports ? `\n${nestedImports}` : "";
+  const reactNodeImport = contentSlotParts.length > 0 ? `\nimport type { ReactNode } from "react";` : "";
+
   const partsJsx = spec.anatomy
     .filter((p) => p.name !== "root")
     .map((part) => {
+      if (part.component !== undefined) {
+        const nestedComponentName = pascalCase(part.component);
+        const fillProps = Object.entries(part.slotFill ?? {})
+          .map(([slotName, fill]) => `${slotName}={${slotFillExpression(fill)}}`)
+          .join(" ");
+        return `      <${nestedComponentName}${fillProps ? ` ${fillProps}` : ""} />`;
+      }
       const liveAttr = part.name === liveRegionPart.name && spec.a11y.ariaLive ? ` aria-live=${JSON.stringify(spec.a11y.ariaLive)}` : "";
-      // Convention: the part named "label" carries the button's text content.
-      const children = part.name === "label" ? "{children}" : "";
+      // contentSlot is the general mechanism; the "label"-name convention is a legacy fallback kept for pre-existing specs (see legacyLabelPart above).
+      const children = part.contentSlot !== undefined ? `{props.${part.name}}` : part.name === "label" && legacyLabelPart ? "{children}" : "";
       return `      <${part.element} className={classes.${part.name}}${liveAttr}>${children}</${part.element}>`;
     })
     .join("\n");
 
-  const source = `${GENERATED_HEADER(SPEC_PATH)}
-import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+  const contextFieldNames = spec.context.map((c) => c.name);
+  const destructuredNames = [...(needsChildrenProp ? ["children"] : []), ...contextFieldNames, "onStateChange"];
+  const machineProps = contextFieldNames.length > 0 ? `{ ${contextFieldNames.join(", ")} }` : "{}";
+
+  const hasClickEvent = spec.events.some((e) => e.name === "CLICK");
+  const hasPendingState = spec.states.some((s) => s.name === "pending");
+  const hasDisabledState = spec.states.some((s) => s.name === "disabled");
+
+  const propsFields = [
+    needsChildrenProp ? "  children: string;" : "",
+    ...contentSlotParts.map((p) => `  ${p.name}${p.contentSlot!.required ? "" : "?"}: ReactNode;`),
+    ...spec.context.map((c) => `  ${c.name}?: ${c.type};`),
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const ariaBusyLine = hasPendingState ? '      aria-busy={state === "pending"}\n' : "";
+  const disabledAttrLine = hasDisabledState ? '      disabled={state === "disabled"}\n' : "";
+  const onClickLine = hasClickEvent
+    ? `      onClick={() => service.send({ type: "CLICK" } as ${componentName}Schema["event"])}\n`
+    : "";
+
+  const source = `${GENERATED_HEADER(filePath)}
+import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";${reactNodeImport}
 import { useMachine } from "@zag-js/react";
 import { ${spec.name} as ${spec.name}Recipe } from "styled-system/recipes";
 import { ${spec.name}Machine } from "./machine";
-import type { ${componentName}Schema } from "./types";
+import type { ${componentName}Schema } from "./types";${nestedImportsLine}
 
 const STATES = [${stateNames.join(", ")}] as const;
 
@@ -46,9 +105,7 @@ ${keyboardEntries}
 };
 
 export interface ${componentName}Props {
-  children: string;
-  disabled?: boolean;
-  successDuration?: number;
+${propsFields}
   /** Fires whenever the underlying state changes — the extension point business logic (e.g. wiring an async action) hooks into, since the spec has no way to express "call this callback and feed its result back as an event." */
   onStateChange?: (state: ${componentName}Schema["state"]) => void;
 }
@@ -58,8 +115,8 @@ export interface ${componentName}Handle {
 }
 
 export const ${componentName} = forwardRef<${componentName}Handle, ${componentName}Props>(function ${componentName}(props, ref) {
-  const { children, disabled, successDuration, onStateChange } = props;
-  const service = useMachine(${spec.name}Machine, { disabled, successDuration } as Partial<${componentName}Schema["props"]>);
+  const { ${destructuredNames.join(", ")} } = props;
+  const service = useMachine(${spec.name}Machine, ${machineProps} as Partial<${componentName}Schema["props"]>);
 
   useImperativeHandle(ref, () => ({ send: service.send }), [service]);
 
@@ -85,10 +142,7 @@ export const ${componentName} = forwardRef<${componentName}Handle, ${componentNa
 ${rootPart.element === "button" ? '      type="button"\n' : ""}      className={classes.root}
       role={${JSON.stringify(spec.a11y.role)}}
       data-state={state}
-      aria-busy={state === "pending"}
-      disabled={state === "disabled"}
-      onClick={() => service.send({ type: "CLICK" } as ${componentName}Schema["event"])}
-      onKeyDown={handleKeyDown}
+${ariaBusyLine}${disabledAttrLine}${onClickLine}      onKeyDown={handleKeyDown}
     >
 ${partsJsx}
     </${rootPart.element}>
@@ -98,7 +152,7 @@ ${partsJsx}
 
   writeFileSync(path.join(componentDir, `${spec.name}.tsx`), source);
 
-  const indexSource = `${GENERATED_HEADER(SPEC_PATH)}
+  const indexSource = `${GENERATED_HEADER(filePath)}
 export { ${componentName}, type ${componentName}Props, type ${componentName}Handle } from "./${spec.name}";
 export { ${spec.name}Machine } from "./machine";
 export type { ${componentName}Schema } from "./types";

@@ -1,7 +1,7 @@
 // GENERATED — DO NOT EDIT. Source: tokens/tokens.json
 
 /** Panda theme.tokens fragment, mechanically converted from the DTCG token document. Register it in panda.config.ts's theme.extend.tokens. */
-export const actionButtonTokens = {
+export const notificationButtonTokens = {
   "colors": {
     "notificationButton": {
       "default": {

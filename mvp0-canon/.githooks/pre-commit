@@ -1,19 +1,25 @@
 #!/usr/bin/env bash
-# Anti-drift guardrail (Fase 8). Blocks committing a hand-edited generated
+# Anti-drift guardrail (Fase 8, generalized to multiple components in the
+# nested-components-slots MVP). Blocks committing a hand-edited generated
 # file. Activate once per clone with:
 #   git config core.hooksPath .githooks
 set -euo pipefail
 
-GENERATED_PATHS=(
+GENERATED_PATTERNS=(
+  "mvp0-canon/packages/ui/*"
+  "mvp0-canon/apps/storybook/stories/*-generated.stories.tsx"
+  "mvp0-canon/test/generated/*.generated.test.tsx"
+)
+GENERATED_PATHSPECS=(
   "mvp0-canon/packages/ui"
-  "mvp0-canon/apps/storybook/stories/action-button-generated.stories.tsx"
-  "mvp0-canon/test/generated/action-button.generated.test.tsx"
+  ":(glob)mvp0-canon/apps/storybook/stories/*-generated.stories.tsx"
+  ":(glob)mvp0-canon/test/generated/*.generated.test.tsx"
 )
 
 staged_generated=false
 while IFS= read -r f; do
-  for gp in "${GENERATED_PATHS[@]}"; do
-    if [[ "$f" == "$gp"* ]]; then
+  for gp in "${GENERATED_PATTERNS[@]}"; do
+    if [[ "$f" == $gp ]]; then
       staged_generated=true
     fi
   done
@@ -26,16 +32,16 @@ fi
 echo "pre-commit: staged changes touch generated files — verifying against 'pnpm generate'..."
 (cd mvp0-canon && pnpm generate >/dev/null)
 
-if ! git diff --quiet -- "${GENERATED_PATHS[@]}"; then
+if ! git diff --quiet -- "${GENERATED_PATHSPECS[@]}"; then
   echo ""
   echo "COMMIT REJECTED: generated files were edited by hand."
-  echo "packages/ui/, the generated stories file, and the generated tests file"
-  echo "must only ever change as output of 'pnpm generate' from the spec."
+  echo "packages/ui/, generated stories files, and generated tests files"
+  echo "must only ever change as output of 'pnpm generate' from a spec."
   echo ""
   echo "Diverging files:"
-  git diff --stat -- "${GENERATED_PATHS[@]}"
+  git diff --stat -- "${GENERATED_PATHSPECS[@]}"
   echo ""
-  echo "Fix: revert the manual edit, change spec/components/action-button.spec.json"
+  echo "Fix: revert the manual edit, change the relevant spec/components/*.spec.json"
   echo "instead, run 'pnpm generate', then stage the regenerated output."
   exit 1
 fi

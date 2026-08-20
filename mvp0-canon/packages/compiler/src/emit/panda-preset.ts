@@ -3,9 +3,6 @@ import path from "node:path";
 import type { ComponentSpec } from "../../../../spec/schema/component.schema.js";
 import { GENERATED_HEADER } from "../naming.js";
 
-const SPEC_PATH = "spec/components/action-button.spec.json";
-const TOKENS_PATH = "tokens/tokens.json";
-
 /** DTCG top-level category name -> Panda theme.tokens category name. */
 const DTCG_TO_PANDA_CATEGORY: Record<string, string> = {
   color: "colors",
@@ -50,18 +47,24 @@ function convertTokens(tokens: Record<string, unknown>): Record<string, unknown>
   return out;
 }
 
-export function emitPandaPreset(spec: ComponentSpec, tokens: Record<string, unknown>, outDir: string): void {
+export function emitPandaPreset(
+  spec: ComponentSpec,
+  tokens: Record<string, unknown>,
+  outDir: string,
+  filePath: string,
+  tokensPath: string,
+): void {
   const componentDir = path.join(outDir, "src", spec.name);
   mkdirSync(componentDir, { recursive: true });
 
   const pandaTokens = convertTokens(tokens);
-  const source = `${GENERATED_HEADER(TOKENS_PATH)}
+  const source = `${GENERATED_HEADER(tokensPath)}
 /** Panda theme.tokens fragment, mechanically converted from the DTCG token document. Register it in panda.config.ts's theme.extend.tokens. */
 export const ${spec.name}Tokens = ${JSON.stringify(pandaTokens, null, 2)} as const;
 `;
   writeFileSync(path.join(componentDir, "tokens.ts"), source);
 
-  const recipeSource = emitRecipe(spec);
+  const recipeSource = emitRecipe(spec, filePath);
   writeFileSync(path.join(componentDir, "recipe.ts"), recipeSource);
 }
 
@@ -70,13 +73,17 @@ function toPandaTokenRef(dtcgRef: string): string {
   return dtcgRef.split(".").slice(1).join(".");
 }
 
-function emitRecipe(spec: ComponentSpec): string {
-  const slots = spec.anatomy.map((p) => JSON.stringify(p.name)).join(", ");
+function emitRecipe(spec: ComponentSpec, filePath: string): string {
+  // A "component"-typed part (nests another generated component) has no
+  // style-slot of its own here — its styling lives entirely inside its own
+  // recipe. Only native ("element") parts get a Panda slot in this recipe.
+  const styledParts = spec.anatomy.filter((p) => p.element !== undefined);
+  const slots = styledParts.map((p) => JSON.stringify(p.name)).join(", ");
 
   const variantEntries = spec.states
     .map((state) => {
       const stateVisual = spec.visual[state.name] ?? {};
-      const partEntries = spec.anatomy
+      const partEntries = styledParts
         .map((part) => {
           const partVisual = stateVisual[part.name] ?? {};
           const propLines = Object.entries(partVisual)
@@ -91,7 +98,7 @@ function emitRecipe(spec: ComponentSpec): string {
 
   const initial = spec.states.find((s) => s.initial)?.name ?? spec.states[0]!.name;
 
-  return `${GENERATED_HEADER(SPEC_PATH)}
+  return `${GENERATED_HEADER(filePath)}
 import { defineSlotRecipe } from "@pandacss/dev";
 
 /**
@@ -99,7 +106,9 @@ import { defineSlotRecipe } from "@pandacss/dev";
  * come from the spec's visual block. Layout (padding, radius, gap, font
  * size, cursor) is NOT modeled in the spec — the schema's VisualProperty
  * enum only covers color — so the compiler supplies a fixed generic base
- * here. See METRICS.md, Fase 4, for why.
+ * here, parametrized by this component's own token namespace (spec.name)
+ * so two components never collide on the same "<name>.gap" token. See
+ * METRICS.md, Fase 4, for why layout itself isn't spec-derived.
  */
 export const ${spec.name}Recipe = defineSlotRecipe({
   className: ${JSON.stringify(`${spec.name}-generated`)},
@@ -109,11 +118,11 @@ export const ${spec.name}Recipe = defineSlotRecipe({
       display: "inline-flex",
       alignItems: "center",
       justifyContent: "center",
-      gap: "actionButton.gap",
-      paddingInline: "actionButton.paddingX",
-      paddingBlock: "actionButton.paddingY",
-      borderRadius: "actionButton",
-      fontSize: "actionButton",
+      gap: ${JSON.stringify(`${spec.name}.gap`)},
+      paddingInline: ${JSON.stringify(`${spec.name}.paddingX`)},
+      paddingBlock: ${JSON.stringify(`${spec.name}.paddingY`)},
+      borderRadius: ${JSON.stringify(spec.name)},
+      fontSize: ${JSON.stringify(spec.name)},
       fontWeight: "medium",
       borderWidth: "1px",
       borderStyle: "solid",

@@ -3,8 +3,6 @@ import type { ComponentSpec } from "../../../../spec/schema/component.schema.js"
 import { GENERATED_HEADER, pascalCase } from "../naming.js";
 import { shortestPathTo } from "../graph.js";
 
-const SPEC_PATH = "spec/components/action-button.spec.json";
-
 /** Sequence of `act(() => result.current.send({...}))` lines to walk from the initial state to `state`. */
 function pathToSendLines(spec: ComponentSpec, state: string): string {
   const path = shortestPathTo(spec, state) ?? [];
@@ -22,7 +20,41 @@ function componentPathToSendLines(spec: ComponentSpec, state: string): string {
     .join("\n");
 }
 
-export function emitTests(spec: ComponentSpec, filePath: string): void {
+function defaultPropValue(type: "string" | "number" | "boolean"): string {
+  switch (type) {
+    case "number":
+      // Deliberately huge: keeps any AFTER-delayed transition (e.g.
+      // action-button's successDuration) from firing mid-test, without
+      // this emitter needing to know which context field is a duration.
+      return "999999";
+    case "boolean":
+      return "false";
+    case "string":
+      return '""';
+  }
+}
+
+/** Constructs a JSX open/close pair that satisfies this component's Props at the type level, regardless of which context fields, contentSlots, or the legacy `children` shim it happens to declare. */
+function jsxForRender(spec: ComponentSpec, componentName: string, attrs: string): string {
+  const legacyLabelPart = spec.anatomy.find((p) => p.name === "label" && p.element !== undefined && p.contentSlot === undefined);
+  const componentParts = spec.anatomy.filter((p) => p.component !== undefined);
+  const usesChildrenForward = componentParts.some((p) => Object.values(p.slotFill ?? {}).some((f) => f.kind === "children"));
+  const needsChildrenProp = legacyLabelPart !== undefined || usesChildrenForward;
+
+  // Only override NUMBER context fields (e.g. a duration driving an
+  // AFTER-delayed transition) — large enough that no timer fires mid-test.
+  // Everything else is left at the spec's own declared default, same as
+  // the machine would use anyway.
+  const contextProps = spec.context.filter((c) => c.type === "number").map((c) => `${c.name}={${defaultPropValue(c.type)}}`);
+  const requiredSlotProps = spec.anatomy
+    .filter((p) => p.contentSlot?.required !== false && p.contentSlot !== undefined)
+    .map((p) => `${p.name}={${JSON.stringify("content")}}`);
+  const allAttrs = [attrs, ...contextProps, ...requiredSlotProps].filter(Boolean).join(" ");
+
+  return needsChildrenProp ? `<${componentName} ${allAttrs}>Save</${componentName}>` : `<${componentName} ${allAttrs} />`;
+}
+
+export function emitTests(spec: ComponentSpec, outFilePath: string, filePath: string): void {
   const componentName = pascalCase(spec.name);
   const initial = spec.states.find((s) => s.initial)!;
 
@@ -76,7 +108,7 @@ ${reach}
       const reach = componentPathToSendLines(spec, state.name);
       return `  it(${JSON.stringify(`[a11y] ${state.name} has no obvious accessibility violations`)}, async () => {
     const ref = { current: null as ${componentName}Handle | null };
-    const { container } = render(<${componentName} ref={ref} successDuration={5000}>Save</${componentName}>);
+    const { container } = render(${jsxForRender(spec, componentName, "ref={ref}")});
     await waitFor(() => expect(ref.current).not.toBeNull());
 ${reach}
     await waitFor(() => expect(container.querySelector(${JSON.stringify(`[data-state="${state.name}"]`)})).not.toBeNull());
@@ -86,7 +118,25 @@ ${reach}
     })
     .join("\n\n");
 
-  const source = `${GENERATED_HEADER(SPEC_PATH)}
+  // A describe() block with zero it()s inside fails at run time ("No test
+  // found in suite") — not every spec has a delayed (AFTER) transition or
+  // an undeclared (state, event) pair (e.g. a small toggle where every
+  // event is valid from every state), so each block is only emitted when
+  // it actually has at least one test. Found while generating statusChip
+  // (no AFTER transitions) and notificationButton (no invalid pairs) — the
+  // action-button spec happens to have at least one of each, which is why
+  // this went unnoticed until a second and third component existed.
+  const blocks = [
+    { title: "valid transitions", body: validTests },
+    { title: "delayed transitions", body: delayedTests },
+    { title: "invalid transitions are no-ops", body: invalidTests.join("\n\n") },
+    { title: "accessibility per state", body: a11yTests },
+  ]
+    .filter((b) => b.body.trim().length > 0)
+    .map((b) => `describe(${JSON.stringify(`${componentName} (generated) — ${b.title}`)}, () => {\n${b.body}\n});`)
+    .join("\n\n");
+
+  const source = `${GENERATED_HEADER(filePath)}
 // One test per declared transition (valid), one per undeclared (state, event)
 // pair (invalid — proving it's a no-op is as important as proving the real
 // ones work), one per AFTER-delayed transition, and one accessibility check
@@ -98,22 +148,8 @@ import { axe } from "vitest-axe";
 import { ${spec.name}Machine } from "../../packages/ui/src/${spec.name}/machine";
 import { ${componentName}, type ${componentName}Handle } from "../../packages/ui/src/${spec.name}/${spec.name}";
 
-describe("${componentName} (generated) — valid transitions", () => {
-${validTests}
-});
-
-describe("${componentName} (generated) — delayed transitions", () => {
-${delayedTests}
-});
-
-describe("${componentName} (generated) — invalid transitions are no-ops", () => {
-${invalidTests.join("\n\n")}
-});
-
-describe("${componentName} (generated) — accessibility per state", () => {
-${a11yTests}
-});
+${blocks}
 `;
 
-  writeFileSync(filePath, source);
+  writeFileSync(outFilePath, source);
 }

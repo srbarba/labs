@@ -66,3 +66,35 @@ Los cinco criterios de éxito de la sección 1 se cumplen:
 Lo que falsaría la hipótesis (sección 1) **no ocurrió**: la spec (90 líneas) es sustancialmente más corta que lo que reemplaza (240–322 líneas de implementación manual equivalente), y cada destino secundario (stories, tests, tratamiento visual) demostró ser real y no trivial — en particular el generador de tests encontró 23 transiciones inválidas que nadie había enumerado a mano, y el generador de stories tuvo que resolver un heurístico de reachability genuinamente no trivial.
 
 Dicho eso, el "no cupo" de arriba es sustancial y no cosmético: el enum de propiedades visuales, el cableado de acciones async, y la distinción construcción-vs-interacción son las tres fronteras reales del modelo actual. Para un MVP 1 con un segundo componente, la pregunta que más vale la pena hacer no es "¿generalizamos el compilador?" sino "¿estas tres fronteras aparecen otra vez con formas distintas, o son artefactos de que `ActionButton` es, específicamente, un botón asíncrono?" — si un segundo componente sin estado async y sin layout inusual no topa con ninguna de las tres, eso sería una señal fuerte de que el modelo generaliza más de lo que este único caso sugiere.
+
+## MVP 1 — Composición de componentes y slots (rama `claude/nested-components-slots-mvp-6nsbbc`)
+
+> Fases A-F. Ver `METRICS.md` para el detalle fase a fase; este apartado consolida el veredicto. `action-button.spec.json` y `packages/ui-manual/` no se tocaron — la validación se hizo con dos componentes nuevos y mínimos (`statusChip`, `notificationButton`) para no arriesgar el veredicto de la Fase 9.
+
+### Las tres capacidades pedidas, y cómo se validó cada una
+
+| # | Capacidad | Cómo se validó | Resultado |
+|---|---|---|---|
+| 1 | Usar un componente ya definido dentro de la anatomía de otro | `notificationButton` anida `statusChip` vía `anatomy[].component`; se genera un `import` real al módulo del componente anidado y se renderiza como JSX | ✅ Compila, testea (125/125) y buildea en Storybook |
+| 2 | Declarar slots de extensibilidad en la spec | `contentSlot` en `AnatomyPart` (`statusChip.content`, `notificationButton.label`), independiente del "slot" de estilo de PandaCSS que ya existía | ✅ Se convierte en una prop `ReactNode` (obligatoria u opcional) en el componente generado |
+| 3 | Pasar contenido al slot de un componente anidado | `slotFill` en la parte `component`, 3 formas (`text` literal, `children` forwarding, `contextRef` al contexto propio) — las 3 probadas con tests unitarios directos del emisor | ✅ `notificationButton` genera `<StatusChip content={"New"} />` |
+
+### Falsación (Fase F) — 7 mutaciones reales, cada una revertida
+
+| # | Mutación | Resultado |
+|---|---|---|
+| 1 | Slot requerido sin llenar | Rechazado — `slot-fill-missing-required` |
+| 2 | Referencia circular (par sintético) | Rechazado — `circular-component-reference`, cadena exacta en el mensaje |
+| 3 | Parte con `element` y `component` a la vez | Rechazado por el esquema Zod |
+| 4 | Parte sin `element` ni `component` | Rechazado por el esquema Zod |
+| 5 | `slotFill` a una key no declarada como slot | Rechazado — `slot-fill-unknown-key` |
+| 6 | `contextRef` a un campo de contexto inexistente | Rechazado — `slot-fill-context-ref-exists` |
+| 7 | El mismo componente referenciado dos veces en una spec | **Aceptado** — dos instancias React independientes, sin caso especial en el compilador |
+
+### Qué no cupo (resumen — detalle completo en `METRICS.md`)
+
+Slots anidados a más de un nivel; `root` no puede ser una referencia a otro componente (rechazado por diseño, no diferido); el padre no puede estilizar el contenido que proyecta en un componente anidado; ningún componente puede ser "sin estado"; `contextRef` no hace prop-drilling multinivel; `tokens.ts` generado no está acotado por componente (inocuo hoy, no escala en bytes); y el generador de stories (`emit/stories.ts`) tenía mucha más superficie implícitamente atada a la forma exacta de `action-button` de la que el plan original anticipaba — generalizado lo suficiente para que los componentes nuevos compilen y tengan stories útiles, pero la story `FullGraphWalk` sigue siendo deliberadamente específica de esa forma exacta.
+
+### Veredicto
+
+**Go.** Las tres capacidades funcionan end-to-end, verificadas por 21 tests unitarios nuevos, generación real de 2 componentes nuevos (`pnpm verify`/`generate`/`typecheck`/`vitest`/`storybook build` en verde junto al componente ya existente, sin tocarlo) y 7 mutaciones reales contra el repositorio. El costo no estuvo en el mecanismo de composición en sí, sino en cuánta generalización implícita faltaba en `emit/stories.ts` y `emit/tests.ts` — exactamente el tipo de "no cupo" que este método está diseñado para sacar a la luz con un segundo y tercer componente, antes de que llegue a producción.

@@ -1,0 +1,39 @@
+{
+  "name": "statusChip",
+  "version": "0.1.0",
+  "anatomy": [
+    { "name": "root", "element": "span", "role": "status" },
+    { "name": "content", "element": "span", "contentSlot": { "required": true } }
+  ],
+  "states": [
+    { "name": "default", "description": "Reposo, sin énfasis", "initial": true },
+    { "name": "highlighted", "description": "Con énfasis visual" }
+  ],
+  "transitions": [
+    { "from": "default", "event": "HIGHLIGHT", "to": "highlighted" },
+    { "from": "highlighted", "event": "RESET", "to": "default" }
+  ],
+  "events": [
+    { "name": "HIGHLIGHT" },
+    { "name": "RESET" }
+  ],
+  "context": [],
+  "visual": {
+    "default": {
+      "root": { "backgroundColor": "color.statusChip.default.bg", "borderColor": "color.statusChip.default.bg" },
+      "content": { "color": "color.statusChip.default.fg" }
+    },
+    "highlighted": {
+      "root": { "backgroundColor": "color.statusChip.highlighted.bg", "borderColor": "color.statusChip.highlighted.bg" },
+      "content": { "color": "color.statusChip.highlighted.fg" }
+    }
+  },
+  "a11y": {
+    "role": "status",
+    "focusBehaviour": {
+      "default": "none",
+      "highlighted": "none"
+    },
+    "keyboard": {}
+  }
+}

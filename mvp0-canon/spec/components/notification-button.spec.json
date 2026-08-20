@@ -1,0 +1,46 @@
+{
+  "name": "notificationButton",
+  "version": "0.1.0",
+  "anatomy": [
+    { "name": "root", "element": "button", "role": "button" },
+    { "name": "label", "element": "span", "contentSlot": { "required": true } },
+    {
+      "name": "statusBadge",
+      "component": "statusChip",
+      "slotFill": { "content": { "kind": "text", "value": "New" } }
+    }
+  ],
+  "states": [
+    { "name": "default", "description": "Reposo, sin marcar", "initial": true },
+    { "name": "active", "description": "Marcado como activo" }
+  ],
+  "transitions": [
+    { "from": "default", "event": "CLICK", "to": "active" },
+    { "from": "active", "event": "CLICK", "to": "default" }
+  ],
+  "events": [
+    { "name": "CLICK" }
+  ],
+  "context": [],
+  "visual": {
+    "default": {
+      "root": { "backgroundColor": "color.notificationButton.default.bg", "borderColor": "color.notificationButton.default.border" },
+      "label": { "color": "color.notificationButton.default.fg" }
+    },
+    "active": {
+      "root": { "backgroundColor": "color.notificationButton.active.bg", "borderColor": "color.notificationButton.active.border" },
+      "label": { "color": "color.notificationButton.active.fg" }
+    }
+  },
+  "a11y": {
+    "role": "button",
+    "focusBehaviour": {
+      "default": "retain",
+      "active": "retain"
+    },
+    "keyboard": {
+      "Enter": "CLICK",
+      " ": "CLICK"
+    }
+  }
+}

@@ -8,11 +8,69 @@ import { z } from "zod";
 
 const identifier = z.string().regex(/^[a-zA-Z][a-zA-Z0-9]*$/, "must be a camelCase identifier");
 
-const AnatomyPart = z.object({
-  name: identifier,
-  element: z.string().min(1),
-  role: z.string().optional(),
-});
+/**
+ * How a `component`-typed anatomy part fills one of the referenced
+ * component's declared `contentSlot` parts. Kept as plain data (a tagged
+ * literal, a forwarding marker, or a reference to this spec's own context
+ * field) — never an expression — matching this file's own rule that a spec
+ * is data, not code.
+ */
+const SlotFillValue = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("text"), value: z.string() }).strict(),
+  z.object({ kind: z.literal("children") }).strict(),
+  z.object({ kind: z.literal("contextRef"), field: identifier }).strict(),
+]);
+
+/**
+ * A part is either a native DOM element (`element`) or an instance of
+ * another component spec (`component`) — never both, never neither
+ * (enforced below, since Zod's object model has no built-in XOR).
+ *
+ * `contentSlot` marks a native part as a content-projection point (what
+ * gets rendered inside it is decided by whoever uses this component) — not
+ * to be confused with PandaCSS's "slot recipe" (style-slots), a completely
+ * different, purely-visual concept used elsewhere in this compiler.
+ *
+ * `slotFill` is only meaningful on a `component` part: it says what fills
+ * each `contentSlot` the referenced component declares.
+ */
+const AnatomyPart = z
+  .object({
+    name: identifier,
+    element: z.string().min(1).optional(),
+    component: identifier.optional(),
+    role: z.string().optional(),
+    contentSlot: z.object({ required: z.boolean().optional().default(true) }).optional(),
+    slotFill: z.record(identifier, SlotFillValue).optional(),
+  })
+  .strict()
+  .superRefine((part, ctx) => {
+    const hasElement = part.element !== undefined;
+    const hasComponent = part.component !== undefined;
+    if (hasElement === hasComponent) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["element"],
+        message: `anatomy part "${part.name}" must declare exactly one of "element" or "component" (has ${
+          hasElement && hasComponent ? "both" : "neither"
+        }).`,
+      });
+    }
+    if (hasElement && part.slotFill !== undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["slotFill"],
+        message: `anatomy part "${part.name}" declares slotFill but has no "component" reference — slotFill only applies to component parts.`,
+      });
+    }
+    if (hasComponent && part.contentSlot !== undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["contentSlot"],
+        message: `anatomy part "${part.name}" cannot be both a component reference and a declared contentSlot — nested-slot forwarding isn't supported.`,
+      });
+    }
+  });
 
 const StateDef = z.object({
   name: identifier,
@@ -76,3 +134,4 @@ export type TransitionDef = z.infer<typeof TransitionDef>;
 export type AnatomyPart = z.infer<typeof AnatomyPart>;
 export type EventDef = z.infer<typeof EventDef>;
 export type ContextField = z.infer<typeof ContextField>;
+export type SlotFillValue = z.infer<typeof SlotFillValue>;

@@ -3,8 +3,6 @@ import path from "node:path";
 import type { ComponentSpec } from "../../../../spec/schema/component.schema.js";
 import { GENERATED_HEADER, guardName, pascalCase, timeoutEffectName, timeoutEventName } from "../naming.js";
 
-const SPEC_PATH = "spec/components/action-button.spec.json";
-
 function tsLiteral(value: string | number | boolean): string {
   return typeof value === "string" ? JSON.stringify(value) : String(value);
 }
@@ -18,7 +16,7 @@ function delayedTransitions(spec: ComponentSpec) {
   return spec.transitions.filter((t) => t.event === "AFTER");
 }
 
-function emitTypes(spec: ComponentSpec): string {
+function emitTypes(spec: ComponentSpec, filePath: string): string {
   const componentName = pascalCase(spec.name);
   const stateUnion = spec.states.map((s) => JSON.stringify(s.name)).join(" | ");
 
@@ -35,7 +33,7 @@ function emitTypes(spec: ComponentSpec): string {
   const contextFields = spec.context.map((c) => `    ${c.name}: ${tsType(c.type)};`).join("\n");
   const propsFields = spec.context.map((c) => `    ${c.name}?: ${tsType(c.type)};`).join("\n");
 
-  return `${GENERATED_HEADER(SPEC_PATH)}
+  return `${GENERATED_HEADER(filePath)}
 export interface ${componentName}Schema {
   props: {
 ${propsFields}
@@ -60,7 +58,7 @@ ${contextFields}
 `;
 }
 
-function emitMachineSource(spec: ComponentSpec): string {
+function emitMachineSource(spec: ComponentSpec, filePath: string): string {
   const componentName = pascalCase(spec.name);
   const delayed = delayedTransitions(spec);
   const delayedByFrom = new Map(delayed.map((t) => [t.from, t]));
@@ -71,7 +69,7 @@ function emitMachineSource(spec: ComponentSpec): string {
 
   const initialState = spec.states.find((s) => s.initial);
   if (!initialState) {
-    throw new Error(`emitMachine: no state is marked "initial: true" in ${SPEC_PATH}`);
+    throw new Error(`emitMachine: no state is marked "initial: true" in ${filePath}`);
   }
 
   const statesSource = spec.states
@@ -122,7 +120,7 @@ function emitMachineSource(spec: ComponentSpec): string {
     .filter(Boolean)
     .join("\n");
 
-  return `${GENERATED_HEADER(SPEC_PATH)}
+  return `${GENERATED_HEADER(filePath)}
 import { setup } from "@zag-js/core";
 import type { ${componentName}Schema } from "./types";
 
@@ -147,9 +145,9 @@ ${implementationsBlock}
 `;
 }
 
-export function emitMachine(spec: ComponentSpec, outDir: string): void {
+export function emitMachine(spec: ComponentSpec, outDir: string, filePath: string): void {
   const componentDir = path.join(outDir, "src", spec.name);
   mkdirSync(componentDir, { recursive: true });
-  writeFileSync(path.join(componentDir, "types.ts"), emitTypes(spec));
-  writeFileSync(path.join(componentDir, "machine.ts"), emitMachineSource(spec));
+  writeFileSync(path.join(componentDir, "types.ts"), emitTypes(spec, filePath));
+  writeFileSync(path.join(componentDir, "machine.ts"), emitMachineSource(spec, filePath));
 }

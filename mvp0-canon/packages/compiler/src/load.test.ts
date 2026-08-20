@@ -60,3 +60,94 @@ describe("ComponentSpec schema", () => {
     expect(result.success).toBe(false);
   });
 });
+
+describe("ComponentSpec schema — anatomy composition (element vs. component, contentSlot, slotFill)", () => {
+  it("accepts a part with only element (unchanged legacy shape)", () => {
+    const result = ComponentSpec.safeParse(validExample);
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts a part with only component", () => {
+    const spec = {
+      ...validExample,
+      anatomy: [
+        ...validExample.anatomy,
+        { name: "icon", component: "badge" },
+      ],
+    };
+    const result = ComponentSpec.safeParse(spec);
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a part with both element and component", () => {
+    const spec = {
+      ...validExample,
+      anatomy: [{ name: "root", element: "button", component: "badge" }],
+    };
+    const result = ComponentSpec.safeParse(spec);
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a part with neither element nor component", () => {
+    const spec = {
+      ...validExample,
+      anatomy: [{ name: "root" }],
+    };
+    const result = ComponentSpec.safeParse(spec);
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects slotFill on a part that has element instead of component", () => {
+    const spec = {
+      ...validExample,
+      anatomy: [{ name: "root", element: "button", slotFill: { content: { kind: "text", value: "x" } } }],
+    };
+    const result = ComponentSpec.safeParse(spec);
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects contentSlot on a part that has component instead of element", () => {
+    const spec = {
+      ...validExample,
+      anatomy: [{ name: "root", element: "button" }, { name: "icon", component: "badge", contentSlot: {} }],
+    };
+    const result = ComponentSpec.safeParse(spec);
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts a contentSlot part with an explicit required flag", () => {
+    const spec = {
+      ...validExample,
+      anatomy: [...validExample.anatomy, { name: "label", element: "span", contentSlot: { required: false } }],
+    };
+    const result = ComponentSpec.safeParse(spec);
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts all three slotFill kinds (text, children, contextRef)", () => {
+    const spec = {
+      ...validExample,
+      context: [{ name: "count", type: "number", default: 0 }],
+      anatomy: [
+        ...validExample.anatomy,
+        {
+          name: "badgeA",
+          component: "badge",
+          slotFill: { content: { kind: "text", value: "New" } },
+        },
+        {
+          name: "badgeB",
+          component: "badge",
+          slotFill: { content: { kind: "children" } },
+        },
+        {
+          name: "badgeC",
+          component: "badge",
+          slotFill: { content: { kind: "contextRef", field: "count" } },
+        },
+      ],
+    };
+    const result = ComponentSpec.safeParse(spec);
+    expect(result.success).toBe(true);
+  });
+});

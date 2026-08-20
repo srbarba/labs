@@ -25,8 +25,8 @@ export class VerificationError extends Error {
  * reported together so a single run surfaces every problem, not just the
  * first one.
  */
-export function verifyCompleteness(spec: ComponentSpec, _tokens: Record<string, unknown>): void {
-  const issues: VerificationIssue[] = [
+export function collectCompletenessIssues(spec: ComponentSpec, _tokens: Record<string, unknown>): VerificationIssue[] {
+  return [
     ...checkVisualCoverage(spec),
     ...checkTransitionTargets(spec),
     ...checkReachability(spec),
@@ -34,6 +34,10 @@ export function verifyCompleteness(spec: ComponentSpec, _tokens: Record<string, 
     ...checkKeyboardEvents(spec),
     ...checkFocusBehaviour(spec),
   ];
+}
+
+export function verifyCompleteness(spec: ComponentSpec, tokens: Record<string, unknown>): void {
+  const issues = collectCompletenessIssues(spec, tokens);
   if (issues.length > 0) {
     throw new VerificationError(issues);
   }
@@ -52,7 +56,10 @@ function checkVisualCoverage(spec: ComponentSpec): VerificationIssue[] {
       });
       continue;
     }
-    for (const part of spec.anatomy) {
+    // A "component"-typed part has no style-slot of its own in this recipe —
+    // its styling lives entirely inside its own generated recipe (see
+    // emit/panda-preset.ts), so it's excluded from this spec's coverage.
+    for (const part of spec.anatomy.filter((p) => p.element !== undefined)) {
       const partVisual = stateVisual[part.name];
       if (!partVisual || Object.keys(partVisual).length === 0) {
         issues.push({

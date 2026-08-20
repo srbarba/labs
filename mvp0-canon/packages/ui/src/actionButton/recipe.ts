@@ -7,7 +7,9 @@ import { defineSlotRecipe } from "@pandacss/dev";
  * come from the spec's visual block. Layout (padding, radius, gap, font
  * size, cursor) is NOT modeled in the spec — the schema's VisualProperty
  * enum only covers color — so the compiler supplies a fixed generic base
- * here. See METRICS.md, Fase 4, for why.
+ * here, parametrized by this component's own token namespace (spec.name)
+ * so two components never collide on the same "<name>.gap" token. See
+ * METRICS.md, Fase 4, for why layout itself isn't spec-derived.
  */
 export const actionButtonRecipe = defineSlotRecipe({
   className: "actionButton-generated",
