@@ -38,6 +38,12 @@ importers:
       '@vitejs/plugin-react':
         specifier: 6.1.0
         version: 6.1.0(vite@8.2.2(@types/node@26.2.0)(esbuild@0.28.2)(tsx@4.23.12))
+      '@zag-js/core':
+        specifier: 1.43.1
+        version: 1.43.1
+      '@zag-js/react':
+        specifier: 1.43.1
+        version: 1.43.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       axe-core:
         specifier: 4.13.0
         version: 4.13.0

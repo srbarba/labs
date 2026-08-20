@@ -33,7 +33,9 @@
     "@pandacss/preset-base": "1.12.0",
     "@pandacss/preset-panda": "1.12.0",
     "@testing-library/user-event": "14.6.5",
-    "zod": "4.4.3"
+    "zod": "4.4.3",
+    "@zag-js/core": "1.43.1",
+    "@zag-js/react": "1.43.1"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

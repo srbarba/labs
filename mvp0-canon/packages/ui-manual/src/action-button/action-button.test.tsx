@@ -8,7 +8,7 @@ describe("ActionButton (manual control)", () => {
   it("reaches idle, pending, success and back to idle", async () => {
     const user = userEvent.setup();
     render(
-      <ActionButton onAction={() => Promise.resolve()} successDuration={20}>
+      <ActionButton onAction={() => Promise.resolve()} successDuration={200}>
         Save
       </ActionButton>,
     );
@@ -25,7 +25,7 @@ describe("ActionButton (manual control)", () => {
   it("reaches error and returns to idle via DISMISS", async () => {
     const user = userEvent.setup();
     render(
-      <ActionButton onAction={() => Promise.reject(new Error("boom"))} successDuration={20}>
+      <ActionButton onAction={() => Promise.reject(new Error("boom"))} successDuration={200}>
         Save
       </ActionButton>,
     );
