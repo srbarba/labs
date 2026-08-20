@@ -1,0 +1,5 @@
+# GENERATED — see packages/compiler/src/emit/*. Never edit these by hand;
+# see the pre-commit hook in .githooks/ and the CI check "check:no-manual-edits".
+packages/ui/** linguist-generated=true
+apps/storybook/stories/action-button-generated.stories.tsx linguist-generated=true
+test/generated/action-button.generated.test.tsx linguist-generated=true
