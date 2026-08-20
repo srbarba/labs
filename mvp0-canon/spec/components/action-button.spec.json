@@ -1,0 +1,81 @@
+{
+  "name": "actionButton",
+  "version": "0.1.0",
+  "anatomy": [
+    { "name": "root", "element": "button", "role": "button" },
+    { "name": "label", "element": "span" },
+    { "name": "indicator", "element": "span" }
+  ],
+  "states": [
+    { "name": "idle", "description": "Reposo, listo para recibir la acción", "initial": true },
+    { "name": "pending", "description": "Acción en curso" },
+    { "name": "success", "description": "Acción completada, con auto-retorno temporizado" },
+    { "name": "error", "description": "Acción fallida, permite reintento" },
+    { "name": "disabled", "description": "No interactivo por decisión del consumidor" }
+  ],
+  "transitions": [
+    { "from": "idle", "event": "CLICK", "to": "pending", "guard": "!disabled" },
+    { "from": "pending", "event": "RESOLVE", "to": "success" },
+    { "from": "pending", "event": "REJECT", "to": "error" },
+    { "from": "success", "event": "AFTER", "to": "idle", "delay": "successDuration" },
+    { "from": "error", "event": "CLICK", "to": "pending" },
+    { "from": "error", "event": "DISMISS", "to": "idle" },
+    { "from": "idle", "event": "DISABLE", "to": "disabled" },
+    { "from": "disabled", "event": "ENABLE", "to": "idle" }
+  ],
+  "events": [
+    { "name": "CLICK" },
+    { "name": "RESOLVE" },
+    { "name": "REJECT" },
+    { "name": "DISMISS" },
+    { "name": "DISABLE" },
+    { "name": "ENABLE" }
+  ],
+  "context": [
+    { "name": "disabled", "type": "boolean", "default": false },
+    { "name": "successDuration", "type": "number", "default": 1500 }
+  ],
+  "visual": {
+    "idle": {
+      "root": { "backgroundColor": "color.actionButton.idle.bg", "borderColor": "color.actionButton.idle.border" },
+      "label": { "color": "color.actionButton.idle.fg" },
+      "indicator": { "color": "color.actionButton.idle.fg" }
+    },
+    "pending": {
+      "root": { "backgroundColor": "color.actionButton.pending.bg", "borderColor": "color.actionButton.pending.border" },
+      "label": { "color": "color.actionButton.pending.fg" },
+      "indicator": { "color": "color.actionButton.pending.fg" }
+    },
+    "success": {
+      "root": { "backgroundColor": "color.actionButton.success.bg", "borderColor": "color.actionButton.success.border" },
+      "label": { "color": "color.actionButton.success.fg" },
+      "indicator": { "color": "color.actionButton.success.fg" }
+    },
+    "error": {
+      "root": { "backgroundColor": "color.actionButton.error.bg", "borderColor": "color.actionButton.error.border" },
+      "label": { "color": "color.actionButton.error.fg" },
+      "indicator": { "color": "color.actionButton.error.fg" }
+    },
+    "disabled": {
+      "root": { "backgroundColor": "color.actionButton.disabled.bg", "borderColor": "color.actionButton.disabled.border" },
+      "label": { "color": "color.actionButton.disabled.fg" },
+      "indicator": { "color": "color.actionButton.disabled.fg" }
+    }
+  },
+  "a11y": {
+    "role": "button",
+    "ariaLive": "polite",
+    "focusBehaviour": {
+      "idle": "retain",
+      "pending": "retain",
+      "success": "retain",
+      "error": "retain",
+      "disabled": "none"
+    },
+    "keyboard": {
+      "Enter": "CLICK",
+      " ": "CLICK",
+      "Escape": "DISMISS"
+    }
+  }
+}

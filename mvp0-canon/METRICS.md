@@ -28,3 +28,10 @@ Registro incremental por fase. Se consolida en `RESULTS.md` en la Fase 9.
 - Test (`load.test.ts`, 10 casos): un ejemplo válido + 4 variantes malformadas (sin estados, propiedad visual no reconocida, campo desconocido en modo strict, referencia de token que no es un dot-path) — todas rechazadas con mensajes accionables.
 - Fricción real de Zod 4: `z.record(enumSchema, valueSchema)` es **exhaustivo** (exige todas las claves del enum), no parcial — hubo que usar `z.partialRecord` para `visual.<state>.<part>`. Sin este ajuste, cualquier estado que no pintara las tres propiedades visuales (`backgroundColor`/`color`/`borderColor`) habría sido rechazado por el propio esquema, no por el verificador — sería el verificador equivocado dando el error equivocado.
 - `zod-to-json-schema` (dependencia listada en la sección 5) resultó incompatible con Zod 4 (su tipado espera la jerarquía de clases de Zod v3). Se sustituyó por `z.toJSONSchema()`, nativo de Zod 4 desde esta versión — se elimina la dependencia externa en vez de forzarla.
+
+## Fase 2 — Especificación de ActionButton
+
+- `spec/components/action-button.spec.json`: 81 líneas. Cubre la tabla completa de la sección 3: 5 estados, 8 transiciones (incluida la temporizada `success --AFTER(successDuration)--> idle` y la ausencia deliberada de `CLICK` en `pending`), 6 eventos, 2 campos de contexto, `visual` para los 5 estados × 3 partes, y el bloque `a11y` completo.
+- Comparación con la implementación manual: 81 líneas de spec frente a 240 líneas en los 4 ficheros manuales equivalentes (`machine.ts` + `types.ts` + `recipe.ts` + `action-button.tsx`) — la spec es ~3× más corta que lo que reemplaza. No hay señal temprana de falsación por longitud/legibilidad.
+- `pnpm verify` pasa en verde contra el fichero real: válido contra el esquema Zod y contra las 6 reglas de completitud de `verify.ts` a la primera.
+- Decisión de modelado: la guarda `!disabled` de la tabla se codifica como el string `"!disabled"` en `transitions[].guard` — sigue siendo dato (una referencia a un campo de contexto con negación por convención), no una función; el compilador decide cómo interpretarla.
