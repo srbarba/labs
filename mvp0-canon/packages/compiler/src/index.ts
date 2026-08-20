@@ -24,7 +24,13 @@ function run(): void {
       verify();
     } else if (command === "generate") {
       verify();
-      generate({ specPath: SPEC_PATH, tokensPath: TOKENS_PATH, outDir: path.join(root, "packages/ui") });
+      generate({
+        specPath: SPEC_PATH,
+        tokensPath: TOKENS_PATH,
+        outDir: path.join(root, "packages/ui"),
+        storiesFilePath: path.join(root, "apps/storybook/stories/action-button-generated.stories.tsx"),
+        testsFilePath: path.join(root, "test/generated/action-button.generated.test.tsx"),
+      });
       console.log("✔ generated packages/ui from the spec");
     } else {
       console.error(`Unknown command: ${command}. Use "verify" or "generate".`);

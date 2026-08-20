@@ -11,12 +11,16 @@ export interface GenerateOptions {
   specPath: string;
   tokensPath: string;
   outDir: string;
+  storiesFilePath: string;
+  testsFilePath: string;
 }
 
 /**
  * The orchestrator: packages/ui is deleted and rebuilt from scratch on
  * every run. Nothing in outDir is meant to survive a regeneration — if it
- * did, it wouldn't belong there.
+ * did, it wouldn't belong there. Stories and tests are emitted to specific,
+ * clearly-named files outside outDir (they live alongside hand-written
+ * siblings), so only those exact files are overwritten, never a whole tree.
  */
 export function generate(options: GenerateOptions): void {
   const spec = loadSpec(options.specPath);
@@ -28,6 +32,6 @@ export function generate(options: GenerateOptions): void {
   emitMachine(spec, options.outDir);
   emitPandaPreset(spec, tokens, options.outDir);
   emitComponent(spec, options.outDir);
-  emitStories(spec, options.outDir);
-  emitTests(spec, options.outDir);
+  emitStories(spec, options.storiesFilePath);
+  emitTests(spec, options.testsFilePath);
 }

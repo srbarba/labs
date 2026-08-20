@@ -11,7 +11,7 @@
     "generate": "pnpm --filter @mvp0/compiler run generate",
     "build": "pnpm run generate && pnpm --filter @mvp0/ui run typecheck",
     "test": "vitest run",
-    "typecheck": "pnpm -r run typecheck",
+    "typecheck": "pnpm -r run typecheck && tsc --noEmit -p test",
     "check:no-manual-edits": "pnpm run generate && git diff --exit-code -- packages/ui"
   },
   "devDependencies": {

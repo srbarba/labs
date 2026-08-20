@@ -1,4 +1,5 @@
 import type { ComponentSpec } from "../../../spec/schema/component.schema.js";
+import { reachableStates } from "./graph.js";
 
 export interface VerificationIssue {
   rule: string;
@@ -93,23 +94,7 @@ function checkReachability(spec: ComponentSpec): VerificationIssue[] {
   const initial = spec.states.find((s) => s.initial);
   if (!initial) return [];
 
-  const adjacency = new Map<string, string[]>();
-  for (const t of spec.transitions) {
-    if (!adjacency.has(t.from)) adjacency.set(t.from, []);
-    adjacency.get(t.from)!.push(t.to);
-  }
-
-  const visited = new Set<string>([initial.name]);
-  const queue = [initial.name];
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    for (const next of adjacency.get(current) ?? []) {
-      if (!visited.has(next)) {
-        visited.add(next);
-        queue.push(next);
-      }
-    }
-  }
+  const visited = reachableStates(spec);
 
   return spec.states
     .filter((s) => !visited.has(s.name))
