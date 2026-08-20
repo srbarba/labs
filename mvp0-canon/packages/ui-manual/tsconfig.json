@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "paths": {
+      "styled-system/*": [
+        "../../styled-system/*"
+      ]
+    }
+  },
+  "include": [
+    "src",
+    "../../vitest-matchers.d.ts"
+  ]
+}

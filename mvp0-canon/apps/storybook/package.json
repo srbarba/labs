@@ -1,0 +1,23 @@
+{
+  "name": "@mvp0/storybook",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "storybook dev -p 6006",
+    "build": "storybook build"
+  },
+  "dependencies": {
+    "@mvp0/ui-manual": "workspace:*",
+    "@mvp0/ui": "workspace:*",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "storybook": "10.5.10",
+    "@storybook/react-vite": "10.5.10",
+    "vite": "8.2.2",
+    "@vitejs/plugin-react": "6.1.0",
+    "typescript": "7.0.2"
+  }
+}

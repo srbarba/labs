@@ -1,0 +1,42 @@
+{
+  "name": "mvp0-canon",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "verify": "pnpm --filter @mvp0/compiler run verify",
+    "generate": "pnpm --filter @mvp0/compiler run generate",
+    "build": "pnpm run generate && pnpm --filter @mvp0/ui run typecheck",
+    "test": "vitest run",
+    "typecheck": "pnpm -r run typecheck",
+    "check:no-manual-edits": "pnpm run generate && git diff --exit-code -- packages/ui"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2",
+    "vitest": "4.1.11",
+    "tsx": "4.23.12",
+    "@pandacss/dev": "1.12.0",
+    "@park-ui/panda-preset": "0.43.1",
+    "@testing-library/react": "16.3.2",
+    "@testing-library/jest-dom": "7.0.1",
+    "@vitejs/plugin-react": "6.1.0",
+    "jsdom": "30.0.1",
+    "vitest-axe": "0.1.0",
+    "axe-core": "4.13.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "@pandacss/preset-base": "1.12.0",
+    "@pandacss/preset-panda": "1.12.0",
+    "@testing-library/user-event": "14.6.5"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}
