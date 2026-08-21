@@ -93,7 +93,7 @@ describe("emitComponent — anatomy composition and content-projection slots", (
     expect(source).toContain("<Badge content={children} />");
   });
 
-  it("a component part with a 'contextRef' slotFill references the parent's own destructured context field", () => {
+  it("a component part with a 'contextRef' slotFill reads the machine's resolved context (default applied, not the raw possibly-undefined prop)", () => {
     const source = emitAndRead(
       spec({
         context: [{ name: "count", type: "number", default: 0 }],
@@ -103,8 +103,10 @@ describe("emitComponent — anatomy composition and content-projection slots", (
         ],
       }),
     );
+    // `count` is still destructured from props — it feeds useMachine's construction props — but the
+    // JSX itself reads service.context.get("count"), which has the spec's default already applied.
     expect(source).toContain("const { count, onStateChange } = props;");
-    expect(source).toContain("<Badge content={count} />");
+    expect(source).toContain('<Badge content={service.context.get("count")} />');
   });
 
   it("two parts referencing the same component produce two independent JSX instances and one deduplicated import", () => {

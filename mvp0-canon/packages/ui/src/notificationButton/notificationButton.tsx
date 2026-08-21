@@ -17,6 +17,7 @@ const KEYBOARD_MAP: Record<string, string> = {
 
 export interface NotificationButtonProps {
   label: ReactNode;
+  statusBadgeText?: string;
   /** Fires whenever the underlying state changes — the extension point business logic (e.g. wiring an async action) hooks into, since the spec has no way to express "call this callback and feed its result back as an event." */
   onStateChange?: (state: NotificationButtonSchema["state"]) => void;
 }
@@ -26,8 +27,8 @@ export interface NotificationButtonHandle {
 }
 
 export const NotificationButton = forwardRef<NotificationButtonHandle, NotificationButtonProps>(function NotificationButton(props, ref) {
-  const { onStateChange } = props;
-  const service = useMachine(notificationButtonMachine, {} as Partial<NotificationButtonSchema["props"]>);
+  const { statusBadgeText, onStateChange } = props;
+  const service = useMachine(notificationButtonMachine, { statusBadgeText } as Partial<NotificationButtonSchema["props"]>);
 
   useImperativeHandle(ref, () => ({ send: service.send }), [service]);
 
@@ -58,7 +59,7 @@ export const NotificationButton = forwardRef<NotificationButtonHandle, Notificat
       onKeyDown={handleKeyDown}
     >
       <span className={classes.label}>{props.label}</span>
-      <StatusChip content={"New"} />
+      <StatusChip content={service.context.get("statusBadgeText")} />
     </button>
   );
 });

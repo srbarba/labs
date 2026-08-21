@@ -7,7 +7,7 @@
     {
       "name": "statusBadge",
       "component": "statusChip",
-      "slotFill": { "content": { "kind": "text", "value": "New" } }
+      "slotFill": { "content": { "kind": "contextRef", "field": "statusBadgeText" } }
     }
   ],
   "states": [
@@ -21,7 +21,9 @@
   "events": [
     { "name": "CLICK" }
   ],
-  "context": [],
+  "context": [
+    { "name": "statusBadgeText", "type": "string", "default": "New" }
+  ],
   "visual": {
     "default": {
       "root": { "backgroundColor": "color.notificationButton.default.bg", "borderColor": "color.notificationButton.default.border" },

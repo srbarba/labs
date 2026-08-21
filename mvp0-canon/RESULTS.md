@@ -95,6 +95,15 @@ Dicho eso, el "no cupo" de arriba es sustancial y no cosmético: el enum de prop
 
 Slots anidados a más de un nivel; `root` no puede ser una referencia a otro componente (rechazado por diseño, no diferido); el padre no puede estilizar el contenido que proyecta en un componente anidado; ningún componente puede ser "sin estado"; `contextRef` no hace prop-drilling multinivel; `tokens.ts` generado no está acotado por componente (inocuo hoy, no escala en bytes); y el generador de stories (`emit/stories.ts`) tenía mucha más superficie implícitamente atada a la forma exacta de `action-button` de la que el plan original anticipaba — generalizado lo suficiente para que los componentes nuevos compilen y tengan stories útiles, pero la story `FullGraphWalk` sigue siendo deliberadamente específica de esa forma exacta.
 
+### Fase G — Refinamiento post-revisión
+
+Dos pedidos sobre el ejemplo real, resueltos sin cambiar el diseño del mecanismo:
+
+- **`slotFill.content.value` como prop propia del componente** (no un literal fijo): `notification-button.spec.json` ya usa `contextRef` con un nuevo campo de contexto `statusBadgeText` (default `"New"`). Al probarlo apareció un bug real: la expresión generada leía la prop cruda de React (`undefined` si no se pasa) en vez del valor resuelto de la máquina de Zag. Corregido leyendo `service.context.get(...)`, que aplica el default correctamente.
+- **Que un click en el badge anidado dispare el `CLICK` del botón padre**: probado antes de diseñar nada — como el badge se renderiza como descendiente real del `<button>` (no vía portal) y no intercepta el evento, el bubbling nativo de React ya lo resuelve sin ningún mecanismo nuevo. Confirmado con un test real, no asumido.
+
+Nuevo test permanente `test/generated/notification-button-composition.test.tsx` (3 casos). **128/128 tests en verde.**
+
 ### Veredicto
 
-**Go.** Las tres capacidades funcionan end-to-end, verificadas por 21 tests unitarios nuevos, generación real de 2 componentes nuevos (`pnpm verify`/`generate`/`typecheck`/`vitest`/`storybook build` en verde junto al componente ya existente, sin tocarlo) y 7 mutaciones reales contra el repositorio. El costo no estuvo en el mecanismo de composición en sí, sino en cuánta generalización implícita faltaba en `emit/stories.ts` y `emit/tests.ts` — exactamente el tipo de "no cupo" que este método está diseñado para sacar a la luz con un segundo y tercer componente, antes de que llegue a producción.
+**Go.** Las tres capacidades funcionan end-to-end, verificadas por 21 tests unitarios nuevos, generación real de 2 componentes nuevos (`pnpm verify`/`generate`/`typecheck`/`vitest`/`storybook build` en verde junto al componente ya existente, sin tocarlo) y 7 mutaciones reales contra el repositorio. El costo no estuvo en el mecanismo de composición en sí, sino en cuánta generalización implícita faltaba en `emit/stories.ts` y `emit/tests.ts` — exactamente el tipo de "no cupo" que este método está diseñado para sacar a la luz con un segundo y tercer componente, antes de que llegue a producción. La revisión posterior confirmó que `contextRef` tenía un bug real (ya corregido) y que el forwarding de eventos padre↔hijo no necesita mecanismo nuevo mientras la composición siga siendo DOM real.

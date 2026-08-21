@@ -8,7 +8,7 @@ const { createMachine } = setup<NotificationButtonSchema>();
 export const notificationButtonMachine = createMachine({
   context({ prop, bindable }) {
     return {
-
+      statusBadgeText: bindable(() => ({ defaultValue: prop("statusBadgeText") ?? "New" })),
     };
   },
   initialState() {

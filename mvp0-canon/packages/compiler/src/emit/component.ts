@@ -10,7 +10,10 @@ function slotFillExpression(fill: SlotFillValue): string {
     case "children":
       return "children";
     case "contextRef":
-      return fill.field;
+      // Reads the machine's resolved context value (default applied, live
+      // if something later updates it) rather than the raw destructured
+      // prop, which is undefined whenever the caller doesn't pass it.
+      return `service.context.get(${JSON.stringify(fill.field)})`;
   }
 }
 

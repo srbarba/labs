@@ -2,14 +2,14 @@
 
 export interface NotificationButtonSchema {
   props: {
-
+    statusBadgeText?: string;
     id?: string;
     ids?: Record<string, any>;
     getRootNode?: () => ShadowRoot | Document | Node;
     [key: string]: any;
   };
   context: {
-
+    statusBadgeText: string;
   };
   refs: Record<string, never>;
   computed: Record<string, never>;
