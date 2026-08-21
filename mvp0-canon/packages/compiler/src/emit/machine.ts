@@ -3,12 +3,12 @@ import path from "node:path";
 import type { ComponentSpec } from "../../../../spec/schema/component.schema.js";
 import { GENERATED_HEADER, contextActionName, guardName, pascalCase, timeoutEffectName, timeoutEventName } from "../naming.js";
 
-function tsLiteral(value: string | number | boolean): string {
-  return typeof value === "string" ? JSON.stringify(value) : String(value);
+function tsLiteral(value: string | number | boolean | string[]): string {
+  return Array.isArray(value) || typeof value === "string" ? JSON.stringify(value) : String(value);
 }
 
-function tsType(type: "string" | "number" | "boolean"): string {
-  return type;
+function tsType(type: "string" | "number" | "boolean" | "stringList"): string {
+  return type === "stringList" ? "string[]" : type;
 }
 
 /** Every AFTER-marked transition, keyed by the state it fires from. */
@@ -20,7 +20,15 @@ function emitTypes(spec: ComponentSpec, filePath: string): string {
   const componentName = pascalCase(spec.name);
   const stateUnion = spec.states.map((s) => JSON.stringify(s.name)).join(" | ");
 
-  const dispatchableEvents = spec.events.map((e) => `{ type: ${JSON.stringify(e.name)} }`);
+  const dispatchableEvents = spec.events.map((e) => {
+    const payloadFields = Object.entries(e.payload ?? {})
+      .map(([field, type]) => `${field}: ${type};`)
+      .join(" ");
+    // No payload -> byte-identical to the pre-payload format (no trailing
+    // "; ") so specs that never use payload (all four pre-existing ones)
+    // regenerate unchanged.
+    return payloadFields ? `{ type: ${JSON.stringify(e.name)}; ${payloadFields} }` : `{ type: ${JSON.stringify(e.name)} }`;
+  });
   const timeoutEvents = delayedTransitions(spec).map((t) => `{ type: ${JSON.stringify(timeoutEventName(t.from))} }`);
   const eventUnion = [...dispatchableEvents, ...timeoutEvents].join("\n  | ");
 
@@ -123,8 +131,22 @@ function emitMachineSource(spec: ComponentSpec, filePath: string): string {
   const actionImpls = actionNames
     .map((name) => {
       const action = spec.transitions.find((t) => t.action && contextActionName(t.action) === name)!.action!;
-      const delta = action.op === "increment" ? "+ 1" : "- 1";
-      return `      ${name}: ({ context }) => context.set(${JSON.stringify(action.field)}, (prev) => prev ${delta}),`;
+      const field = JSON.stringify(action.field);
+      switch (action.op) {
+        case "increment":
+        case "decrement": {
+          const delta = action.op === "increment" ? "+ 1" : "- 1";
+          return `      ${name}: ({ context }) => context.set(${field}, (prev) => prev ${delta}),`;
+        }
+        case "push": {
+          const sourceField = JSON.stringify(action.source!.field);
+          return `      ${name}: ({ context, event }) => context.set(${field}, (prev) => [...(prev as string[]), (event as any)[${sourceField}]]),`;
+        }
+        case "removeAt": {
+          const sourceField = JSON.stringify(action.source!.field);
+          return `      ${name}: ({ context, event }) => context.set(${field}, (prev) => (prev as string[]).filter((_, i) => i !== (event as any)[${sourceField}])),`;
+        }
+      }
     })
     .join("\n");
 

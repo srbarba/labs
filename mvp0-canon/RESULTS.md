@@ -67,6 +67,46 @@ Lo que falsaría la hipótesis (sección 1) **no ocurrió**: la spec (90 líneas
 
 Dicho eso, el "no cupo" de arriba es sustancial y no cosmético: el enum de propiedades visuales, el cableado de acciones async, y la distinción construcción-vs-interacción son las tres fronteras reales del modelo actual. Para un MVP 1 con un segundo componente, la pregunta que más vale la pena hacer no es "¿generalizamos el compilador?" sino "¿estas tres fronteras aparecen otra vez con formas distintas, o son artefactos de que `ActionButton` es, específicamente, un botón asíncrono?" — si un segundo componente sin estado async y sin layout inusual no topa con ninguna de las tres, eso sería una señal fuerte de que el modelo generaliza más de lo que este único caso sugiere.
 
+## MVP 3 — Una colección: `InputTags` (rama `claude/input-tags-mvp-dho7z1`)
+
+> Ver `METRICS.md` para el detalle completo (investigación en Zag.js/Ark UI/Park UI, diseño, hallazgos, falsación, verificación en navegador real); este apartado consolida el veredicto. Los 4 componentes anteriores (`actionButton`, `statusChip`, `notificationButton`, `counter`) no se tocan — la validación se hace con un quinto componente nuevo, `inputTags`: un campo de texto donde Enter añade un tag y cada tag renderizado lleva su propio botón de borrado.
+
+### La pregunta que se puso a prueba
+
+MVP 0-2 modelan el estado de un componente como un enum de estados nombrados más, como mucho (MVP 2), un campo de contexto **escalar** mutado por eventos propios. Ninguno necesitó una parte de la anatomía que se renderizara más de una vez, ni un evento que llevara consigo un dato real (`EventDef.payload` existía en el schema desde el principio pero ningún emisor lo usaba nunca). Un tags-input — cuyo "estado" central es literalmente un array que crece y encoge, con un nodo del DOM independientemente interactivo por elemento — pone a prueba si eso cabe en el canon tal y como quedó tras MVP 2. Investigación previa: se clonaron los repos de Zag.js, Ark UI y Park UI para leer su implementación real de tags-input (anatomía de 10 partes, máquina con edición inline, Backspace, autocompletado) — deliberadamente más rica que el objetivo de esta MVP, que no fue paridad de producto sino esta única capacidad.
+
+### Las cuatro capacidades pedidas, y cómo se validó cada una
+
+| # | Capacidad | Cómo se validó | Resultado |
+|---|---|---|---|
+| 1 | Un campo de contexto que sea una colección, no un escalar | `ContextField.type: "stringList"` (`string[]`, default `[]`) | ✅ `tags` crece/encoge de verdad, confirmado leyendo su valor en tests, no solo el estado nombrado |
+| 2 | Un evento que lleve un dato real desde el DOM hasta una mutación de contexto | `EventDef.payload` (ya existente, nunca usado) por fin emitido en el tipo del evento; `ContextAction.op: "push"/"removeAt"` con `source: {kind:"payloadField", field}` | ✅ `ADD_TAG{value}`/`REMOVE_TAG{index}` mutan el array vía `context.set` con el valor real del evento |
+| 3 | Una parte de la anatomía que se renderice N veces, una por elemento | `AnatomyPart.repeatOver` + `items: AnatomyItemPart[]` — un tipo hermano deliberadamente más pequeño que `AnatomyPart` | ✅ N chips independientes en el DOM, cada uno con su propio `onClick` atado a SU índice vía `onClickPayload: {"$index"}` |
+| 4 | Un campo de texto libre que alimente el context vía un evento real, sin controlarlo por React | `AnatomyPart.submitOnEnter: {event, payloadField}` — lee el DOM del input en Enter, envía el evento, se limpia | ✅ Escribir + Enter añade el tag y vacía el input, confirmado en jsdom Y en Chromium real vía Playwright |
+
+### Falsación (10 mutaciones reales contra `input-tags.spec.json`, cada una revertida)
+
+| # | Mutación | Resultado |
+|---|---|---|
+| 1 | `repeatOver` referencia un campo no declarado | Rechazado — `repeat-over-field-exists` |
+| 2 | `repeatOver` sobre un campo que no es `stringList` | Rechazado — `repeat-over-field-exists`, cita el tipo real |
+| 3 | acción `push` sobre un campo que no es `stringList` | Rechazado — `transition-action-field-exists` |
+| 4 | acción `push` sin `source` | Rechazado por el esquema Zod |
+| 5 | `onClickPayload` rellena una clave de payload no declarada | Rechazado — `item-click-payload-exists` |
+| 6 | `submitOnEnter.event` no declarado en `events[]` | Rechazado — `submit-on-enter-event-exists` |
+| 7 | `onClick` de un item referencia un evento no declarado | Rechazado — `item-click-event-exists` |
+| 8 | `onClickPayload` alimenta un campo `number` con `$item` (produce `string`) | Rechazado — `item-click-payload-exists`, "types don't match" |
+| 9 | `repeatOver` sin `items` | Rechazado por el esquema Zod |
+| 10 | `submitOnEnter` combinado con `onClick` | Rechazado por el esquema Zod |
+
+### Qué no cupo (resumen — detalle completo en `METRICS.md`)
+
+Un solo nivel de repetición (`items` no puede tener su propio `repeatOver`, no hay listas de listas); `items` no admite componer otro componente generado (solo elementos nativos); ningún atajo de teclado sobre el array salvo Enter-para-añadir (el Backspace-borra-el-último-tag de Zag/Ark/Park UI no se modeló — exigiría leer el DOM efímero del input como una guarda, y no hay mecanismo para eso); el trim + no-vacío de `submitOnEnter` es una convención fija del compilador, no un dato de la spec (sin deduplicar, sin longitud máxima, sin delimitador configurable); y — mismo límite ya documentado en MVP 2, ahora sobre un array en vez de un número — el generador de tests/stories sigue sin vocabulario para el VALOR del contexto, así que la mutación real solo queda probada por un fichero escrito a mano (`test/generated/input-tags-composition.test.tsx`, 7 casos, incluyendo borrar el tag del MEDIO por índice — la prueba más exigente del mecanismo). Hallazgo no anticipado: a diferencia de MVP 2 (donde un botón sin texto se resolvió reutilizando `contentSlot` ya existente), el botón de borrar dentro de un `items` SÍ necesitó un mecanismo nuevo — `AnatomyItemPart.text`/`.ariaLabel` (literales, contraparte de `SlotFillValue.text`) — porque `contentSlot` no tiene sentido dentro de un template por-elemento.
+
+### Veredicto
+
+**Go.** Las cuatro capacidades funcionan end-to-end: 10 tests unitarios nuevos del compiler (22/22 en `verify.test.ts`, 173/173 en todo el repo), generación real de `InputTags` compilando/testeando/buildeando junto a los 4 componentes existentes sin tocarlos (bytes idénticos salvo la inflación ya conocida de `tokens.ts`), 7 tests de comportamiento escritos a mano que prueban la mutación real del array, una verificación adicional en Chromium real vía Playwright, y 10 mutaciones reales contra el repositorio, todas rechazadas con mensajes distintos. El costo no estuvo en el mecanismo de bajo nivel (`context.set` con un array; Zag no necesitó nada nuevo) sino en que "una parte de la anatomía" había sido, sin decirlo, una parte que se renderiza una vez durante tres MVPs seguidas — repetirla obligó a un tipo de dato hermano en vez de una extensión, y un campo del schema sin usar en tres MVPs (`EventDef.payload`) resultó ser exactamente la pieza que faltaba.
+
 ## MVP 2 — Un componente con estado propio: `Counter` (rama `claude/counter-component-mvp-omi04e`)
 
 > Ver `METRICS.md` para el detalle completo (diseño, hallazgos, falsación); este apartado consolida el veredicto. `action-button.spec.json`, `status-chip.spec.json` y `notification-button.spec.json` no se tocan — la validación se hace con un cuarto componente nuevo, `counter`: dos botones (`+`/`-`) y un texto que muestra el contador.

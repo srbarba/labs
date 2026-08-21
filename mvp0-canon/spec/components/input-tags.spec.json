@@ -1,0 +1,69 @@
+{
+  "name": "inputTags",
+  "version": "0.1.0",
+  "anatomy": [
+    { "name": "root", "element": "div", "role": "group" },
+    {
+      "name": "item",
+      "element": "span",
+      "repeatOver": "tags",
+      "items": [
+        { "name": "itemText", "element": "span", "itemTextBinding": "$item" },
+        {
+          "name": "itemDeleteTrigger",
+          "element": "button",
+          "text": "×",
+          "ariaLabel": "Remove tag",
+          "onClick": "REMOVE_TAG",
+          "onClickPayload": { "index": "$index" }
+        }
+      ]
+    },
+    {
+      "name": "input",
+      "element": "input",
+      "ariaLabel": "Add tag",
+      "submitOnEnter": { "event": "ADD_TAG", "payloadField": "value" }
+    }
+  ],
+  "states": [
+    { "name": "active", "description": "Único estado: siempre lista para añadir o quitar tags", "initial": true }
+  ],
+  "transitions": [
+    {
+      "from": "active",
+      "event": "ADD_TAG",
+      "to": "active",
+      "action": { "field": "tags", "op": "push", "source": { "kind": "payloadField", "field": "value" } }
+    },
+    {
+      "from": "active",
+      "event": "REMOVE_TAG",
+      "to": "active",
+      "action": { "field": "tags", "op": "removeAt", "source": { "kind": "payloadField", "field": "index" } }
+    }
+  ],
+  "events": [
+    { "name": "ADD_TAG", "payload": { "value": "string" } },
+    { "name": "REMOVE_TAG", "payload": { "index": "number" } }
+  ],
+  "context": [
+    { "name": "tags", "type": "stringList", "default": [] }
+  ],
+  "visual": {
+    "active": {
+      "root": { "backgroundColor": "color.inputTags.active.bg", "borderColor": "color.inputTags.active.border" },
+      "item": { "backgroundColor": "color.inputTags.active.itemBg", "borderColor": "color.inputTags.active.itemBorder" },
+      "itemText": { "color": "color.inputTags.active.itemFg" },
+      "itemDeleteTrigger": { "backgroundColor": "color.inputTags.active.itemBg", "color": "color.inputTags.active.itemFg" },
+      "input": { "color": "color.inputTags.active.fg", "backgroundColor": "color.inputTags.active.bg" }
+    }
+  },
+  "a11y": {
+    "role": "group",
+    "focusBehaviour": {
+      "active": "retain"
+    },
+    "keyboard": {}
+  }
+}

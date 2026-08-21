@@ -131,6 +131,28 @@ export const counterTokens = {
           "value": "#ffffff"
         }
       }
+    },
+    "inputTags": {
+      "active": {
+        "bg": {
+          "value": "#ffffff"
+        },
+        "border": {
+          "value": "#d1d5db"
+        },
+        "fg": {
+          "value": "#111827"
+        },
+        "itemBg": {
+          "value": "#e0e7ff"
+        },
+        "itemBorder": {
+          "value": "#c7d2fe"
+        },
+        "itemFg": {
+          "value": "#3730a3"
+        }
+      }
     }
   },
   "radii": {
@@ -144,6 +166,9 @@ export const counterTokens = {
       "value": "9999px"
     },
     "counter": {
+      "value": "8px"
+    },
+    "inputTags": {
       "value": "8px"
     }
   },
@@ -191,6 +216,17 @@ export const counterTokens = {
       "gap": {
         "value": "12px"
       }
+    },
+    "inputTags": {
+      "paddingX": {
+        "value": "8px"
+      },
+      "paddingY": {
+        "value": "6px"
+      },
+      "gap": {
+        "value": "6px"
+      }
     }
   },
   "fontSizes": {
@@ -205,6 +241,9 @@ export const counterTokens = {
     },
     "counter": {
       "value": "16px"
+    },
+    "inputTags": {
+      "value": "14px"
     }
   }
 } as const;

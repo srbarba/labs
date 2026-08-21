@@ -146,7 +146,7 @@ ${playLines}
 
   const wrapperPropsType = [
     ...(async ? ['settleMode?: "resolve" | "reject" | "never"'] : []),
-    ...spec.context.map((c) => `${c.name}?: ${c.type}`),
+    ...spec.context.map((c) => `${c.name}?: ${c.type === "stringList" ? "string[]" : c.type}`),
   ].join("; ");
 
   const onStateChangeBlock = async

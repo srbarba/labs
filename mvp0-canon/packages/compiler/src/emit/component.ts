@@ -1,7 +1,72 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import type { ComponentSpec, SlotFillValue } from "../../../../spec/schema/component.schema.js";
+import type { AnatomyItemPart, ComponentSpec, SlotFillValue } from "../../../../spec/schema/component.schema.js";
 import { GENERATED_HEADER, pascalCase } from "../naming.js";
+
+function propsType(type: "string" | "number" | "boolean" | "stringList"): string {
+  return type === "stringList" ? "string[]" : type;
+}
+
+/** The loop-variable expression an item template's onClickPayload entry compiles to, inside the .map() callback emitted by repeatedPartJsx below. */
+function loopRefExpression(ref: "$item" | "$index"): string {
+  return ref === "$item" ? "item" : "index";
+}
+
+function itemPartJsx(item: AnatomyItemPart, componentName: string): string {
+  const typeAttr = item.element === "button" ? ' type="button"' : "";
+  const ariaLabelAttr = item.ariaLabel !== undefined ? ` aria-label=${JSON.stringify(item.ariaLabel)}` : "";
+  const onClickAttr = item.onClick
+    ? (() => {
+        const payloadEntries = Object.entries(item.onClickPayload ?? {})
+          .map(([field, ref]) => `${field}: ${loopRefExpression(ref)}`)
+          .join(", ");
+        return ` onClick={(event) => {\n          event.stopPropagation();\n          service.send({ type: ${JSON.stringify(item.onClick)}${payloadEntries ? `, ${payloadEntries}` : ""} } as ${componentName}Schema["event"]);\n        }}`;
+      })()
+    : "";
+  const children = item.itemTextBinding === "$item" ? "{item}" : item.text !== undefined ? item.text : "";
+  return `        <${item.element}${typeAttr}${ariaLabelAttr} className={classes.${item.name}}${onClickAttr}>${children}</${item.element}>`;
+}
+
+/**
+ * Renders a `repeatOver` part: one DOM node per element of the array context
+ * field it names, each carrying its own `items` template — the mechanism a
+ * collection (e.g. the tags in an input-tags widget) needs to go from "one
+ * array in context" to "N independently-interactive nodes," which no other
+ * anatomy part kind can express (every other kind renders exactly once).
+ */
+function repeatedPartJsx(part: ComponentSpec["anatomy"][number], componentName: string): string {
+  const typeAttr = part.element === "button" ? ' type="button"' : "";
+  const itemsJsx = part.items!.map((item) => itemPartJsx(item, componentName)).join("\n");
+  return `      {(service.context.get(${JSON.stringify(part.repeatOver)}) as string[]).map((item: string, index: number) => (
+        <${part.element}${typeAttr} key={index} className={classes.${part.name}}>
+${itemsJsx}
+        </${part.element}>
+      ))}`;
+}
+
+/**
+ * Renders a `submitOnEnter` part: an uncontrolled text input that, on Enter,
+ * reads its own current DOM value directly (no controlled React state, no
+ * context field for the in-progress draft), dispatches the declared event
+ * with that value under the declared payload field, and clears itself.
+ * Trimming + the non-empty guard are a fixed compiler convention (like the
+ * base layout in panda-preset.ts) — the spec has no field for either.
+ */
+function submitOnEnterPartJsx(part: ComponentSpec["anatomy"][number], componentName: string): string {
+  const { event: eventName, payloadField } = part.submitOnEnter!;
+  const ariaLabelAttr = part.ariaLabel !== undefined ? `\n        aria-label=${JSON.stringify(part.ariaLabel)}` : "";
+  return `      <${part.element}
+        className={classes.${part.name}}${ariaLabelAttr}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter") return;
+          event.preventDefault();
+          const value = event.currentTarget.value.trim();
+          if (!value) return;
+          service.send({ type: ${JSON.stringify(eventName)}, ${payloadField}: value } as ${componentName}Schema["event"]);
+          event.currentTarget.value = "";
+        }}
+      />`;
+}
 
 function slotFillExpression(fill: SlotFillValue): string {
   switch (fill.kind) {
@@ -59,6 +124,12 @@ export function emitComponent(spec: ComponentSpec, outDir: string, filePath: str
   const partsJsx = spec.anatomy
     .filter((p) => p.name !== "root")
     .map((part) => {
+      if (part.repeatOver !== undefined) {
+        return repeatedPartJsx(part, componentName);
+      }
+      if (part.submitOnEnter !== undefined) {
+        return submitOnEnterPartJsx(part, componentName);
+      }
       if (part.component !== undefined) {
         const nestedComponentName = pascalCase(part.component);
         const fillProps = Object.entries(part.slotFill ?? {})
@@ -91,6 +162,7 @@ export function emitComponent(spec: ComponentSpec, outDir: string, filePath: str
         return `      <${nestedComponentName}${fillProps ? ` ${fillProps}` : ""}${onEventProp} />`;
       }
       const liveAttr = part.name === liveRegionPart.name && spec.a11y.ariaLive ? ` aria-live=${JSON.stringify(spec.a11y.ariaLive)}` : "";
+      const ariaLabelAttr = part.ariaLabel !== undefined ? ` aria-label=${JSON.stringify(part.ariaLabel)}` : "";
       const typeAttr = part.element === "button" ? ' type="button"' : "";
       // The general per-part click mechanism (see AnatomyPart.onClick in the
       // schema) — needed once a component has more than one independently
@@ -112,7 +184,7 @@ export function emitComponent(spec: ComponentSpec, outDir: string, filePath: str
             : part.name === "label" && legacyLabelPart
               ? "{children}"
               : "";
-      return `      <${part.element}${typeAttr} className={classes.${part.name}}${liveAttr}${onClickAttr}>${children}</${part.element}>`;
+      return `      <${part.element}${typeAttr}${ariaLabelAttr} className={classes.${part.name}}${liveAttr}${onClickAttr}>${children}</${part.element}>`;
     })
     .join("\n");
 
@@ -128,7 +200,7 @@ export function emitComponent(spec: ComponentSpec, outDir: string, filePath: str
   const propsFields = [
     needsChildrenProp ? "  children: string;" : "",
     ...contentSlotParts.map((p) => `  ${p.name}${p.contentSlot!.required ? "" : "?"}: ReactNode;`),
-    ...spec.context.map((c) => `  ${c.name}?: ${c.type};`),
+    ...spec.context.map((c) => `  ${c.name}?: ${propsType(c.type)};`),
   ]
     .filter(Boolean)
     .join("\n");

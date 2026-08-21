@@ -36,6 +36,10 @@ export function collectCompletenessIssues(spec: ComponentSpec, _tokens: Record<s
     ...checkTransitionActionFields(spec),
     ...checkTextBindingFields(spec),
     ...checkPartClickEvents(spec),
+    ...checkRepeatOverFields(spec),
+    ...checkItemClickEvents(spec),
+    ...checkItemClickPayload(spec),
+    ...checkSubmitOnEnter(spec),
   ];
 }
 
@@ -61,8 +65,11 @@ function checkVisualCoverage(spec: ComponentSpec): VerificationIssue[] {
     }
     // A "component"-typed part has no style-slot of its own in this recipe —
     // its styling lives entirely inside its own generated recipe (see
-    // emit/panda-preset.ts), so it's excluded from this spec's coverage.
-    for (const part of spec.anatomy.filter((p) => p.element !== undefined)) {
+    // emit/panda-preset.ts), so it's excluded from this spec's coverage. A
+    // `repeatOver` part's `items` template parts get their own slots too
+    // (see emit/panda-preset.ts) and so need coverage of their own.
+    const itemParts = spec.anatomy.flatMap((p) => p.items ?? []);
+    for (const part of [...spec.anatomy.filter((p) => p.element !== undefined), ...itemParts]) {
       const partVisual = stateVisual[part.name];
       if (!partVisual || Object.keys(partVisual).length === 0) {
         issues.push({
@@ -143,26 +150,162 @@ function checkKeyboardEvents(spec: ComponentSpec): VerificationIssue[] {
   return issues;
 }
 
-/** Rule: a transition's `action.field` must reference a declared, numeric context field — increment/decrement is only meaningful on a number. */
+/**
+ * Rule: a transition's `action.field` must reference a declared context
+ * field of the type its op requires (increment/decrement -> "number",
+ * push/removeAt -> "stringList"), and when the op needs a `source` (the
+ * schema itself already requires push/removeAt to declare one), that
+ * source's payload field must actually be declared on the transition's OWN
+ * `event`, with the type the op expects (push reads a "string", removeAt an
+ * index — a "number").
+ */
 function checkTransitionActionFields(spec: ComponentSpec): VerificationIssue[] {
   const issues: VerificationIssue[] = [];
+  const eventsByName = new Map(spec.events.map((e) => [e.name, e]));
   spec.transitions.forEach((transition, index) => {
     if (!transition.action) return;
-    const field = spec.context.find((c) => c.name === transition.action!.field);
+    const action = transition.action;
+    const field = spec.context.find((c) => c.name === action.field);
+    const expectedType = action.op === "increment" || action.op === "decrement" ? "number" : "stringList";
     if (!field) {
       issues.push({
         rule: "transition-action-field-exists",
         path: `transitions[${index}].action.field`,
-        message: `transition's action references context field "${transition.action.field}", which isn't declared in context[] — declared fields are: ${spec.context.map((c) => c.name).join(", ") || "(none)"}.`,
+        message: `transition's action references context field "${action.field}", which isn't declared in context[] — declared fields are: ${spec.context.map((c) => c.name).join(", ") || "(none)"}.`,
       });
-    } else if (field.type !== "number") {
+    } else if (field.type !== expectedType) {
       issues.push({
         rule: "transition-action-field-exists",
         path: `transitions[${index}].action.field`,
-        message: `transition's action (${transition.action.op}) targets context field "${field.name}", which is type "${field.type}" — increment/decrement only apply to a "number" field.`,
+        message: `transition's action (${action.op}) targets context field "${field.name}", which is type "${field.type}" — ${action.op} only applies to a "${expectedType}" field.`,
+      });
+    }
+    if (!action.source) return;
+    const event = eventsByName.get(transition.event);
+    const payloadType = event?.payload?.[action.source.field];
+    if (payloadType === undefined) {
+      issues.push({
+        rule: "transition-action-source-exists",
+        path: `transitions[${index}].action.source.field`,
+        message: `transition's action (${action.op}) sources its value from payload field "${action.source.field}" of event "${transition.event}", which isn't declared in that event's payload — declared payload fields are: ${Object.keys(event?.payload ?? {}).join(", ") || "(none)"}.`,
+      });
+      return;
+    }
+    const expectedPayloadType = action.op === "push" ? "string" : "number";
+    if (payloadType !== expectedPayloadType) {
+      issues.push({
+        rule: "transition-action-source-exists",
+        path: `transitions[${index}].action.source.field`,
+        message: `transition's action (${action.op}) sources its value from payload field "${action.source.field}" of event "${transition.event}", which is type "${payloadType}" — ${action.op} expects a "${expectedPayloadType}" payload field.`,
       });
     }
   });
+  return issues;
+}
+
+/** Rule: an item-template part's `onClick` must reference a declared event (the item-template counterpart of checkPartClickEvents). */
+function checkItemClickEvents(spec: ComponentSpec): VerificationIssue[] {
+  const eventNames = new Set(spec.events.map((e) => e.name));
+  const issues: VerificationIssue[] = [];
+  for (const part of spec.anatomy) {
+    for (const item of part.items ?? []) {
+      if (item.onClick === undefined) continue;
+      if (!eventNames.has(item.onClick)) {
+        issues.push({
+          rule: "item-click-event-exists",
+          path: `anatomy.${part.name}.items.${item.name}.onClick`,
+          message: `item part "${item.name}" (in "${part.name}") declares onClick "${item.onClick}", which isn't declared in events[] — declared events are: ${[...eventNames].join(", ") || "(none)"}.`,
+        });
+      }
+    }
+  }
+  return issues;
+}
+
+/** Rule: every onClickPayload entry on an item-template part must name a payload field the target event actually declares, of a type the loop variable it's fed from can produce ($index -> "number", $item -> "string"). */
+function checkItemClickPayload(spec: ComponentSpec): VerificationIssue[] {
+  const eventsByName = new Map(spec.events.map((e) => [e.name, e]));
+  const issues: VerificationIssue[] = [];
+  for (const part of spec.anatomy) {
+    for (const item of part.items ?? []) {
+      if (item.onClick === undefined || !item.onClickPayload) continue;
+      const event = eventsByName.get(item.onClick);
+      if (!event) continue; // reported by checkItemClickEvents
+      for (const [payloadField, loopRef] of Object.entries(item.onClickPayload)) {
+        const payloadType = event.payload?.[payloadField];
+        const producedType = loopRef === "$index" ? "number" : "string";
+        if (payloadType === undefined) {
+          issues.push({
+            rule: "item-click-payload-exists",
+            path: `anatomy.${part.name}.items.${item.name}.onClickPayload.${payloadField}`,
+            message: `item part "${item.name}" (in "${part.name}") fills payload field "${payloadField}" of event "${item.onClick}", which isn't declared in that event's payload — declared payload fields are: ${Object.keys(event.payload ?? {}).join(", ") || "(none)"}.`,
+          });
+        } else if (payloadType !== producedType) {
+          issues.push({
+            rule: "item-click-payload-exists",
+            path: `anatomy.${part.name}.items.${item.name}.onClickPayload.${payloadField}`,
+            message: `item part "${item.name}" (in "${part.name}") fills payload field "${payloadField}" (type "${payloadType}") from loop variable "${loopRef}", which produces a "${producedType}" — types don't match.`,
+          });
+        }
+      }
+    }
+  }
+  return issues;
+}
+
+/** Rule: a submitOnEnter part's `event` must be declared, and its `payloadField` must be a "string" field of that event's payload. */
+function checkSubmitOnEnter(spec: ComponentSpec): VerificationIssue[] {
+  const eventsByName = new Map(spec.events.map((e) => [e.name, e]));
+  const issues: VerificationIssue[] = [];
+  for (const part of spec.anatomy) {
+    if (!part.submitOnEnter) continue;
+    const event = eventsByName.get(part.submitOnEnter.event);
+    if (!event) {
+      issues.push({
+        rule: "submit-on-enter-event-exists",
+        path: `anatomy.${part.name}.submitOnEnter.event`,
+        message: `part "${part.name}" declares submitOnEnter targeting event "${part.submitOnEnter.event}", which isn't declared in events[] — declared events are: ${spec.events.map((e) => e.name).join(", ") || "(none)"}.`,
+      });
+      continue;
+    }
+    const payloadType = event.payload?.[part.submitOnEnter.payloadField];
+    if (payloadType === undefined) {
+      issues.push({
+        rule: "submit-on-enter-payload-exists",
+        path: `anatomy.${part.name}.submitOnEnter.payloadField`,
+        message: `part "${part.name}" declares submitOnEnter.payloadField "${part.submitOnEnter.payloadField}", which isn't declared in event "${part.submitOnEnter.event}"'s payload — declared payload fields are: ${Object.keys(event.payload ?? {}).join(", ") || "(none)"}.`,
+      });
+    } else if (payloadType !== "string") {
+      issues.push({
+        rule: "submit-on-enter-payload-exists",
+        path: `anatomy.${part.name}.submitOnEnter.payloadField`,
+        message: `part "${part.name}" declares submitOnEnter.payloadField "${part.submitOnEnter.payloadField}", which is type "${payloadType}" — submitOnEnter always sends the input's (trimmed) text, a "string".`,
+      });
+    }
+  }
+  return issues;
+}
+
+/** Rule: an anatomy part's `repeatOver` must reference a declared "stringList" context field. */
+function checkRepeatOverFields(spec: ComponentSpec): VerificationIssue[] {
+  const issues: VerificationIssue[] = [];
+  for (const part of spec.anatomy) {
+    if (part.repeatOver === undefined) continue;
+    const field = spec.context.find((c) => c.name === part.repeatOver);
+    if (!field) {
+      issues.push({
+        rule: "repeat-over-field-exists",
+        path: `anatomy.${part.name}.repeatOver`,
+        message: `part "${part.name}" repeats over context field "${part.repeatOver}", which isn't declared in context[] — declared fields are: ${spec.context.map((c) => c.name).join(", ") || "(none)"}.`,
+      });
+    } else if (field.type !== "stringList") {
+      issues.push({
+        rule: "repeat-over-field-exists",
+        path: `anatomy.${part.name}.repeatOver`,
+        message: `part "${part.name}" repeats over context field "${field.name}", which is type "${field.type}" — repeatOver only applies to a "stringList" field.`,
+      });
+    }
+  }
   return issues;
 }
 

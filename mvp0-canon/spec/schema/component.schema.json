@@ -24,13 +24,185 @@
             "type": "string",
             "minLength": 1
           },
+          "component": {
+            "type": "string",
+            "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+          },
           "role": {
             "type": "string"
+          },
+          "contentSlot": {
+            "type": "object",
+            "properties": {
+              "required": {
+                "default": true,
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "required"
+            ],
+            "additionalProperties": false
+          },
+          "slotFill": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+            },
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "text"
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "value"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "children"
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "contextRef"
+                    },
+                    "field": {
+                      "type": "string",
+                      "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "field"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "onChildEvent": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "minLength": 1
+            },
+            "additionalProperties": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "onClick": {
+            "type": "string",
+            "minLength": 1
+          },
+          "textBinding": {
+            "type": "string",
+            "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+          },
+          "ariaLabel": {
+            "type": "string",
+            "minLength": 1
+          },
+          "repeatOver": {
+            "type": "string",
+            "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+          },
+          "items": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+                },
+                "element": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "itemTextBinding": {
+                  "type": "string",
+                  "const": "$item"
+                },
+                "text": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "ariaLabel": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "onClick": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "onClickPayload": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string",
+                    "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+                  },
+                  "additionalProperties": {
+                    "type": "string",
+                    "enum": [
+                      "$item",
+                      "$index"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "name",
+                "element"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "submitOnEnter": {
+            "type": "object",
+            "properties": {
+              "event": {
+                "type": "string",
+                "minLength": 1
+              },
+              "payloadField": {
+                "type": "string",
+                "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+              }
+            },
+            "required": [
+              "event",
+              "payloadField"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
-          "name",
-          "element"
+          "name"
         ],
         "additionalProperties": false
       }
@@ -89,6 +261,47 @@
           },
           "delay": {
             "type": "string"
+          },
+          "action": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "increment",
+                  "decrement",
+                  "push",
+                  "removeAt"
+                ]
+              },
+              "source": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "payloadField"
+                  },
+                  "field": {
+                    "type": "string",
+                    "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "field"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "field",
+              "op"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -115,7 +328,12 @@
               "type": "string"
             },
             "additionalProperties": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "string",
+                "number",
+                "boolean"
+              ]
             }
           }
         },
@@ -139,7 +357,8 @@
             "enum": [
               "string",
               "number",
-              "boolean"
+              "boolean",
+              "stringList"
             ]
           },
           "default": {
@@ -152,6 +371,12 @@
               },
               {
                 "type": "boolean"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
               }
             ]
           }

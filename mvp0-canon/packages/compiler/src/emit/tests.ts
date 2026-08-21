@@ -20,7 +20,7 @@ function componentPathToSendLines(spec: ComponentSpec, state: string): string {
     .join("\n");
 }
 
-function defaultPropValue(type: "string" | "number" | "boolean"): string {
+function defaultPropValue(type: "string" | "number" | "boolean" | "stringList"): string {
   switch (type) {
     case "number":
       // Deliberately huge: keeps any AFTER-delayed transition (e.g.
@@ -31,6 +31,10 @@ function defaultPropValue(type: "string" | "number" | "boolean"): string {
       return "false";
     case "string":
       return '""';
+    case "stringList":
+      // Unreachable today (this is only ever called on the number-typed
+      // fields filtered below), kept for switch exhaustiveness.
+      return "[]";
   }
 }
 

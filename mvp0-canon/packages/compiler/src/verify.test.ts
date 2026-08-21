@@ -188,6 +188,205 @@ describe("verifyCompleteness — five ways to break the spec produce five distin
     }
   });
 
+});
+
+const chipListFixture: ComponentSpec = ComponentSpec.parse({
+  name: "chipList",
+  version: "0.1.0",
+  anatomy: [
+    { name: "root", element: "div" },
+    {
+      name: "chip",
+      element: "span",
+      repeatOver: "items",
+      items: [
+        { name: "chipText", element: "span", itemTextBinding: "$item" },
+        { name: "chipRemove", element: "button", text: "×", ariaLabel: "Remove", onClick: "REMOVE", onClickPayload: { index: "$index" } },
+      ],
+    },
+    { name: "input", element: "input", submitOnEnter: { event: "ADD", payloadField: "value" } },
+  ],
+  states: [{ name: "active", description: "active", initial: true }],
+  transitions: [
+    { from: "active", event: "ADD", to: "active", action: { field: "items", op: "push", source: { kind: "payloadField", field: "value" } } },
+    { from: "active", event: "REMOVE", to: "active", action: { field: "items", op: "removeAt", source: { kind: "payloadField", field: "index" } } },
+  ],
+  events: [
+    { name: "ADD", payload: { value: "string" } },
+    { name: "REMOVE", payload: { index: "number" } },
+  ],
+  context: [{ name: "items", type: "stringList", default: [] }],
+  visual: {
+    active: {
+      root: { backgroundColor: "color.chipList.active.bg" },
+      chip: { backgroundColor: "color.chipList.active.chipBg" },
+      chipText: { color: "color.chipList.active.chipFg" },
+      chipRemove: { color: "color.chipList.active.chipFg" },
+      input: { color: "color.chipList.active.fg" },
+    },
+  },
+  a11y: {
+    role: "group",
+    focusBehaviour: { active: "retain" },
+    keyboard: {},
+  },
+});
+
+describe("verifyCompleteness — collection rules (repeatOver / item payload / submitOnEnter / push-removeAt sources)", () => {
+  it("accepts the valid chipList fixture with no issues", () => {
+    expect(() => verifyCompleteness(chipListFixture, tokens())).not.toThrow();
+  });
+
+  it("repeatOver referencing an undeclared context field fails with rule repeat-over-field-exists", () => {
+    const broken: ComponentSpec = {
+      ...chipListFixture,
+      anatomy: chipListFixture.anatomy.map((p) => (p.name === "chip" ? { ...p, repeatOver: "bogus" } : p)),
+    };
+    try {
+      verifyCompleteness(broken, tokens());
+      throw new Error("expected verifyCompleteness to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(VerificationError);
+      const err = error as VerificationError;
+      expect(err.issues.some((i) => i.rule === "repeat-over-field-exists" && i.message.includes("bogus"))).toBe(true);
+    }
+  });
+
+  it("repeatOver on a non-stringList field fails with rule repeat-over-field-exists", () => {
+    const broken: ComponentSpec = {
+      ...chipListFixture,
+      context: [...chipListFixture.context, { name: "label", type: "string", default: "" }],
+      anatomy: chipListFixture.anatomy.map((p) => (p.name === "chip" ? { ...p, repeatOver: "label" } : p)),
+    };
+    try {
+      verifyCompleteness(broken, tokens());
+      throw new Error("expected verifyCompleteness to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(VerificationError);
+      const err = error as VerificationError;
+      expect(err.issues.some((i) => i.rule === "repeat-over-field-exists" && i.message.includes('"string"'))).toBe(true);
+    }
+  });
+
+  it("an item part's onClick referencing an undeclared event fails with rule item-click-event-exists", () => {
+    const broken: ComponentSpec = {
+      ...chipListFixture,
+      anatomy: chipListFixture.anatomy.map((p) =>
+        p.name === "chip" ? { ...p, items: p.items!.map((it) => (it.name === "chipRemove" ? { ...it, onClick: "BOGUS" } : it)) } : p,
+      ),
+    };
+    try {
+      verifyCompleteness(broken, tokens());
+      throw new Error("expected verifyCompleteness to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(VerificationError);
+      const err = error as VerificationError;
+      expect(err.issues.some((i) => i.rule === "item-click-event-exists" && i.message.includes("BOGUS"))).toBe(true);
+    }
+  });
+
+  it("an item part's onClickPayload naming an undeclared payload field fails with rule item-click-payload-exists", () => {
+    const broken: ComponentSpec = {
+      ...chipListFixture,
+      anatomy: chipListFixture.anatomy.map((p) =>
+        p.name === "chip"
+          ? { ...p, items: p.items!.map((it) => (it.name === "chipRemove" ? { ...it, onClickPayload: { bogus: "$index" as const } } : it)) }
+          : p,
+      ),
+    };
+    try {
+      verifyCompleteness(broken, tokens());
+      throw new Error("expected verifyCompleteness to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(VerificationError);
+      const err = error as VerificationError;
+      expect(err.issues.some((i) => i.rule === "item-click-payload-exists" && i.message.includes("bogus"))).toBe(true);
+    }
+  });
+
+  it("an item part's onClickPayload feeding the wrong loop-variable type fails with rule item-click-payload-exists", () => {
+    const broken: ComponentSpec = {
+      ...chipListFixture,
+      anatomy: chipListFixture.anatomy.map((p) =>
+        p.name === "chip"
+          ? { ...p, items: p.items!.map((it) => (it.name === "chipRemove" ? { ...it, onClickPayload: { index: "$item" as const } } : it)) }
+          : p,
+      ),
+    };
+    try {
+      verifyCompleteness(broken, tokens());
+      throw new Error("expected verifyCompleteness to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(VerificationError);
+      const err = error as VerificationError;
+      expect(err.issues.some((i) => i.rule === "item-click-payload-exists" && i.message.includes("types don't match"))).toBe(true);
+    }
+  });
+
+  it("submitOnEnter targeting an undeclared event fails with rule submit-on-enter-event-exists", () => {
+    const broken: ComponentSpec = {
+      ...chipListFixture,
+      anatomy: chipListFixture.anatomy.map((p) => (p.name === "input" ? { ...p, submitOnEnter: { event: "BOGUS", payloadField: "value" } } : p)),
+    };
+    try {
+      verifyCompleteness(broken, tokens());
+      throw new Error("expected verifyCompleteness to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(VerificationError);
+      const err = error as VerificationError;
+      expect(err.issues.some((i) => i.rule === "submit-on-enter-event-exists" && i.message.includes("BOGUS"))).toBe(true);
+    }
+  });
+
+  it("submitOnEnter.payloadField naming an undeclared payload field fails with rule submit-on-enter-payload-exists", () => {
+    const broken: ComponentSpec = {
+      ...chipListFixture,
+      anatomy: chipListFixture.anatomy.map((p) => (p.name === "input" ? { ...p, submitOnEnter: { event: "ADD", payloadField: "bogus" } } : p)),
+    };
+    try {
+      verifyCompleteness(broken, tokens());
+      throw new Error("expected verifyCompleteness to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(VerificationError);
+      const err = error as VerificationError;
+      expect(err.issues.some((i) => i.rule === "submit-on-enter-payload-exists" && i.message.includes("bogus"))).toBe(true);
+    }
+  });
+
+  it("a push action sourcing from an undeclared payload field fails with rule transition-action-source-exists", () => {
+    const broken: ComponentSpec = {
+      ...chipListFixture,
+      transitions: chipListFixture.transitions.map((t) =>
+        t.event === "ADD" ? { ...t, action: { field: "items", op: "push" as const, source: { kind: "payloadField" as const, field: "bogus" } } } : t,
+      ),
+    };
+    try {
+      verifyCompleteness(broken, tokens());
+      throw new Error("expected verifyCompleteness to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(VerificationError);
+      const err = error as VerificationError;
+      expect(err.issues.some((i) => i.rule === "transition-action-source-exists" && i.message.includes("bogus"))).toBe(true);
+    }
+  });
+
+  it("a removeAt action sourcing from a wrongly-typed payload field fails with rule transition-action-source-exists", () => {
+    const broken: ComponentSpec = {
+      ...chipListFixture,
+      events: [...chipListFixture.events.filter((e) => e.name !== "REMOVE"), { name: "REMOVE", payload: { index: "string" } }],
+    };
+    try {
+      verifyCompleteness(broken, tokens());
+      throw new Error("expected verifyCompleteness to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(VerificationError);
+      const err = error as VerificationError;
+      expect(err.issues.some((i) => i.rule === "transition-action-source-exists" && i.message.includes('expects a "number"'))).toBe(true);
+    }
+  });
+});
+
+describe("verifyCompleteness — five ways to break the spec produce five distinct, actionable messages", () => {
   it("all five broken specs produce genuinely different messages from each other", () => {
     const messages = new Set<string>();
     const cases: ComponentSpec[] = [

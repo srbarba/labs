@@ -22,7 +22,7 @@ export function guardName(expression: string): string {
 }
 
 /** Action implementation key for a transition's context mutation, e.g. {field:"count",op:"increment"} -> "incrementCount". */
-export function contextActionName(action: { field: string; op: "increment" | "decrement" }): string {
+export function contextActionName(action: { field: string; op: "increment" | "decrement" | "push" | "removeAt" }): string {
   return `${action.op}${pascalCase(action.field)}`;
 }
 
