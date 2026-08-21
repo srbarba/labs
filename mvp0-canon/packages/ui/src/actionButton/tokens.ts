@@ -142,14 +142,18 @@ export const actionButtonTokens = {
         },
         "fg": {
           "value": "#111827"
-        },
-        "itemBg": {
+        }
+      }
+    },
+    "tag": {
+      "active": {
+        "bg": {
           "value": "#e0e7ff"
         },
-        "itemBorder": {
+        "border": {
           "value": "#c7d2fe"
         },
-        "itemFg": {
+        "fg": {
           "value": "#3730a3"
         }
       }
@@ -170,6 +174,9 @@ export const actionButtonTokens = {
     },
     "inputTags": {
       "value": "8px"
+    },
+    "tag": {
+      "value": "9999px"
     }
   },
   "spacing": {
@@ -227,6 +234,17 @@ export const actionButtonTokens = {
       "gap": {
         "value": "6px"
       }
+    },
+    "tag": {
+      "paddingX": {
+        "value": "8px"
+      },
+      "paddingY": {
+        "value": "2px"
+      },
+      "gap": {
+        "value": "4px"
+      }
     }
   },
   "fontSizes": {
@@ -244,6 +262,9 @@ export const actionButtonTokens = {
     },
     "inputTags": {
       "value": "14px"
+    },
+    "tag": {
+      "value": "13px"
     }
   }
 } as const;

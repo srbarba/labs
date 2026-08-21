@@ -190,6 +190,12 @@ describe("verifyCompleteness — five ways to break the spec produce five distin
 
 });
 
+// A repeated `component` part — one nested `chip` instance per element of
+// `items[]`, its own event ("REMOVE") forwarded under a DIFFERENT name
+// ("REMOVE_ITEM") this spec declares, carrying which position raised it.
+// `chip` itself is never resolved against a registry here — that
+// cross-spec check (component-reference-exists) lives in
+// verify-composition.test.ts, not exercised by verifyCompleteness alone.
 const chipListFixture: ComponentSpec = ComponentSpec.parse({
   name: "chipList",
   version: "0.1.0",
@@ -197,31 +203,34 @@ const chipListFixture: ComponentSpec = ComponentSpec.parse({
     { name: "root", element: "div" },
     {
       name: "chip",
-      element: "span",
+      component: "chip",
       repeatOver: "items",
-      items: [
-        { name: "chipText", element: "span", itemTextBinding: "$item" },
-        { name: "chipRemove", element: "button", text: "×", ariaLabel: "Remove", onClick: "REMOVE", onClickPayload: { index: "$index" } },
-      ],
+      slotFill: { label: { kind: "loopItem" } },
+      onChildEvent: { REMOVE: "REMOVE_ITEM" },
+      onChildEventPayload: { REMOVE: { index: "$index" } },
     },
     { name: "input", element: "input", submitOnEnter: { event: "ADD", payloadField: "value" } },
   ],
   states: [{ name: "active", description: "active", initial: true }],
   transitions: [
     { from: "active", event: "ADD", to: "active", action: { field: "items", op: "push", source: { kind: "payloadField", field: "value" } } },
-    { from: "active", event: "REMOVE", to: "active", action: { field: "items", op: "removeAt", source: { kind: "payloadField", field: "index" } } },
+    {
+      from: "active",
+      event: "REMOVE_ITEM",
+      to: "active",
+      action: { field: "items", op: "removeAt", source: { kind: "payloadField", field: "index" } },
+    },
   ],
   events: [
     { name: "ADD", payload: { value: "string" } },
-    { name: "REMOVE", payload: { index: "number" } },
+    { name: "REMOVE_ITEM", payload: { index: "number" } },
   ],
   context: [{ name: "items", type: "stringList", default: [] }],
   visual: {
+    // "chip" is a component part (repeated or not) — no style-slot of its
+    // own here, so it needs no visual-coverage entry.
     active: {
       root: { backgroundColor: "color.chipList.active.bg" },
-      chip: { backgroundColor: "color.chipList.active.chipBg" },
-      chipText: { color: "color.chipList.active.chipFg" },
-      chipRemove: { color: "color.chipList.active.chipFg" },
       input: { color: "color.chipList.active.fg" },
     },
   },
@@ -232,7 +241,7 @@ const chipListFixture: ComponentSpec = ComponentSpec.parse({
   },
 });
 
-describe("verifyCompleteness — collection rules (repeatOver / item payload / submitOnEnter / push-removeAt sources)", () => {
+describe("verifyCompleteness — collection rules (repeatOver / child-event payload / submitOnEnter / push-removeAt sources)", () => {
   it("accepts the valid chipList fixture with no issues", () => {
     expect(() => verifyCompleteness(chipListFixture, tokens())).not.toThrow();
   });
@@ -268,11 +277,11 @@ describe("verifyCompleteness — collection rules (repeatOver / item payload / s
     }
   });
 
-  it("an item part's onClick referencing an undeclared event fails with rule item-click-event-exists", () => {
+  it("onChildEventPayload naming a payload field the forwarded event doesn't declare fails with rule child-event-payload-exists", () => {
     const broken: ComponentSpec = {
       ...chipListFixture,
       anatomy: chipListFixture.anatomy.map((p) =>
-        p.name === "chip" ? { ...p, items: p.items!.map((it) => (it.name === "chipRemove" ? { ...it, onClick: "BOGUS" } : it)) } : p,
+        p.name === "chip" ? { ...p, onChildEventPayload: { REMOVE: { bogus: "$index" as const } } } : p,
       ),
     };
     try {
@@ -281,17 +290,15 @@ describe("verifyCompleteness — collection rules (repeatOver / item payload / s
     } catch (error) {
       expect(error).toBeInstanceOf(VerificationError);
       const err = error as VerificationError;
-      expect(err.issues.some((i) => i.rule === "item-click-event-exists" && i.message.includes("BOGUS"))).toBe(true);
+      expect(err.issues.some((i) => i.rule === "child-event-payload-exists" && i.message.includes("bogus"))).toBe(true);
     }
   });
 
-  it("an item part's onClickPayload naming an undeclared payload field fails with rule item-click-payload-exists", () => {
+  it("onChildEventPayload feeding the wrong loop-variable type fails with rule child-event-payload-exists", () => {
     const broken: ComponentSpec = {
       ...chipListFixture,
       anatomy: chipListFixture.anatomy.map((p) =>
-        p.name === "chip"
-          ? { ...p, items: p.items!.map((it) => (it.name === "chipRemove" ? { ...it, onClickPayload: { bogus: "$index" as const } } : it)) }
-          : p,
+        p.name === "chip" ? { ...p, onChildEventPayload: { REMOVE: { index: "$item" as const } } } : p,
       ),
     };
     try {
@@ -300,26 +307,7 @@ describe("verifyCompleteness — collection rules (repeatOver / item payload / s
     } catch (error) {
       expect(error).toBeInstanceOf(VerificationError);
       const err = error as VerificationError;
-      expect(err.issues.some((i) => i.rule === "item-click-payload-exists" && i.message.includes("bogus"))).toBe(true);
-    }
-  });
-
-  it("an item part's onClickPayload feeding the wrong loop-variable type fails with rule item-click-payload-exists", () => {
-    const broken: ComponentSpec = {
-      ...chipListFixture,
-      anatomy: chipListFixture.anatomy.map((p) =>
-        p.name === "chip"
-          ? { ...p, items: p.items!.map((it) => (it.name === "chipRemove" ? { ...it, onClickPayload: { index: "$item" as const } } : it)) }
-          : p,
-      ),
-    };
-    try {
-      verifyCompleteness(broken, tokens());
-      throw new Error("expected verifyCompleteness to throw");
-    } catch (error) {
-      expect(error).toBeInstanceOf(VerificationError);
-      const err = error as VerificationError;
-      expect(err.issues.some((i) => i.rule === "item-click-payload-exists" && i.message.includes("types don't match"))).toBe(true);
+      expect(err.issues.some((i) => i.rule === "child-event-payload-exists" && i.message.includes("types don't match"))).toBe(true);
     }
   });
 
@@ -373,7 +361,7 @@ describe("verifyCompleteness — collection rules (repeatOver / item payload / s
   it("a removeAt action sourcing from a wrongly-typed payload field fails with rule transition-action-source-exists", () => {
     const broken: ComponentSpec = {
       ...chipListFixture,
-      events: [...chipListFixture.events.filter((e) => e.name !== "REMOVE"), { name: "REMOVE", payload: { index: "string" } }],
+      events: [...chipListFixture.events.filter((e) => e.name !== "REMOVE_ITEM"), { name: "REMOVE_ITEM", payload: { index: "string" } }],
     };
     try {
       verifyCompleteness(broken, tokens());

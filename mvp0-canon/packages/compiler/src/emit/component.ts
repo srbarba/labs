@@ -1,46 +1,86 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import type { AnatomyItemPart, ComponentSpec, SlotFillValue } from "../../../../spec/schema/component.schema.js";
+import type { ComponentSpec, SlotFillValue } from "../../../../spec/schema/component.schema.js";
 import { GENERATED_HEADER, pascalCase } from "../naming.js";
 
 function propsType(type: "string" | "number" | "boolean" | "stringList"): string {
   return type === "stringList" ? "string[]" : type;
 }
 
-/** The loop-variable expression an item template's onClickPayload entry compiles to, inside the .map() callback emitted by repeatedPartJsx below. */
+/** The loop-variable expression an onChildEventPayload entry compiles to, inside the .map() callback emitted by repeatedComponentPartJsx below. */
 function loopRefExpression(ref: "$item" | "$index"): string {
   return ref === "$item" ? "item" : "index";
 }
 
-function itemPartJsx(item: AnatomyItemPart, componentName: string): string {
-  const typeAttr = item.element === "button" ? ' type="button"' : "";
-  const ariaLabelAttr = item.ariaLabel !== undefined ? ` aria-label=${JSON.stringify(item.ariaLabel)}` : "";
-  const onClickAttr = item.onClick
-    ? (() => {
-        const payloadEntries = Object.entries(item.onClickPayload ?? {})
-          .map(([field, ref]) => `${field}: ${loopRefExpression(ref)}`)
-          .join(", ");
-        return ` onClick={(event) => {\n          event.stopPropagation();\n          service.send({ type: ${JSON.stringify(item.onClick)}${payloadEntries ? `, ${payloadEntries}` : ""} } as ${componentName}Schema["event"]);\n        }}`;
-      })()
-    : "";
-  const children = item.itemTextBinding === "$item" ? "{item}" : item.text !== undefined ? item.text : "";
-  return `        <${item.element}${typeAttr}${ariaLabelAttr} className={classes.${item.name}}${onClickAttr}>${children}</${item.element}>`;
+/**
+ * Builds a `component` part's `onEvent` prop — the callback that catches
+ * every event the nested instance's own machine processes and, for each one
+ * `onChildEvent` maps, forwards this spec's own mapped event. Shared by both
+ * a single nested instance and a `repeatOver`-repeated one: `part.onChildEventPayload`
+ * is only ever populated on a repeated part (schema-enforced), so on a
+ * plain single instance every payload map is empty and this degrades to the
+ * bare `{ type: parentEvent }` forward MVP 1/2 already established.
+ */
+function onEventForwardingProp(part: ComponentSpec["anatomy"][number], componentName: string): string {
+  const childEventEntries = Object.entries(part.onChildEvent ?? {});
+  if (childEventEntries.length === 0) return "";
+  // Delivered through the nested component's own `onEvent` prop (a
+  // machine-level `watch` hook, see emit/machine.ts) — a React callback,
+  // not a DOM event — so it fires whether or not the nested markup is a DOM
+  // descendant of anything, and is unaffected by the stopPropagation() this
+  // same file adds to a component's own click handling below.
+  //
+  // The forwarded send() is deferred one macrotask (setTimeout 0), found
+  // necessary by testing, not assumed: calling send() on a DIFFERENT
+  // machine instance synchronously — or even microtask-deferred via
+  // queueMicrotask — from inside watch()'s callback reliably hung the two
+  // machines in an infinite mutual-update loop. A full macrotask tick lets
+  // both machines' own reactive flush cycles settle first. See METRICS.md
+  // for the isolated repro.
+  //
+  // `FORWARDED_CHILD_EVENTS.has(event)` guards against a SEPARATE hazard,
+  // found (not assumed) building `InputTags`: Zag's `watch` hook re-invokes
+  // `prop("onEvent")?.(event.current())` whenever ANY prop passed to
+  // `useMachine` changes identity — including this very `onEvent` callback,
+  // which this file recreates on every parent render (e.g. one .map() entry
+  // per array element, so ANY unrelated parent re-render — typing in an
+  // input, another item being added or removed — recreates all of them).
+  // `event.current()` keeps returning the SAME object reference for the
+  // nested instance's last real event, so without this guard a parent
+  // re-render silently REPLAYS that stale event and re-sends its forward —
+  // for a `repeatOver` part this corrupts the array (a stale REMOVE_TAG
+  // replays against whatever now occupies that array position). The
+  // WeakSet is module-scoped (not per-render) so a real send is recorded
+  // once and never forwarded twice, for the lifetime of that event object.
+  const lines = childEventEntries.map(([childEvent, parentEvent]) => {
+    const payloadMap = part.onChildEventPayload?.[childEvent] ?? {};
+    const payloadEntries = Object.entries(payloadMap)
+      .map(([field, ref]) => `${field}: ${loopRefExpression(ref as "$item" | "$index")}`)
+      .join(", ");
+    const eventLiteral = `{ type: ${JSON.stringify(parentEvent)}${payloadEntries ? `, ${payloadEntries}` : ""} }`;
+    return `          if (event.type === ${JSON.stringify(childEvent)} && !FORWARDED_CHILD_EVENTS.has(event)) {\n            FORWARDED_CHILD_EVENTS.add(event);\n            setTimeout(() => service.send(${eventLiteral} as ${componentName}Schema["event"]), 0);\n          }`;
+  });
+  return ` onEvent={(event) => {\n${lines.join("\n")}\n        }}`;
 }
 
 /**
- * Renders a `repeatOver` part: one DOM node per element of the array context
- * field it names, each carrying its own `items` template — the mechanism a
- * collection (e.g. the tags in an input-tags widget) needs to go from "one
- * array in context" to "N independently-interactive nodes," which no other
- * anatomy part kind can express (every other kind renders exactly once).
+ * Renders a `repeatOver` part: one instance of the referenced component per
+ * element of the array context field it names — the mechanism a collection
+ * (e.g. the tags in an input-tags widget) needs to go from "one array in
+ * context" to "N independently-interactive, separately-composed component
+ * instances," which no other anatomy part kind can express (every other
+ * kind renders exactly once). Each instance gets the current loop element
+ * via `slotFill`'s `"loopItem"` kind and, via `onChildEventPayload`, can
+ * tell the parent which position in the array raised a forwarded event.
  */
-function repeatedPartJsx(part: ComponentSpec["anatomy"][number], componentName: string): string {
-  const typeAttr = part.element === "button" ? ' type="button"' : "";
-  const itemsJsx = part.items!.map((item) => itemPartJsx(item, componentName)).join("\n");
+function repeatedComponentPartJsx(part: ComponentSpec["anatomy"][number], componentName: string): string {
+  const nestedComponentName = pascalCase(part.component!);
+  const fillProps = Object.entries(part.slotFill ?? {})
+    .map(([slotName, fill]) => `${slotName}={${slotFillExpression(fill)}}`)
+    .join(" ");
+  const onEventProp = onEventForwardingProp(part, componentName);
   return `      {(service.context.get(${JSON.stringify(part.repeatOver)}) as string[]).map((item: string, index: number) => (
-        <${part.element}${typeAttr} key={index} className={classes.${part.name}}>
-${itemsJsx}
-        </${part.element}>
+        <${nestedComponentName} key={index}${fillProps ? ` ${fillProps}` : ""}${onEventProp} />
       ))}`;
 }
 
@@ -79,6 +119,9 @@ function slotFillExpression(fill: SlotFillValue): string {
       // if something later updates it) rather than the raw destructured
       // prop, which is undefined whenever the caller doesn't pass it.
       return `service.context.get(${JSON.stringify(fill.field)})`;
+    case "loopItem":
+      // Only valid (schema-enforced) inside the .map() callback repeatedComponentPartJsx emits, where "item" is the current array element.
+      return "item";
   }
 }
 
@@ -120,12 +163,18 @@ export function emitComponent(spec: ComponentSpec, outDir: string, filePath: str
     .join("\n");
   const nestedImportsLine = nestedImports ? `\n${nestedImports}` : "";
   const reactNodeImport = contentSlotParts.length > 0 ? `\nimport type { ReactNode } from "react";` : "";
+  // See onEventForwardingProp's own comment for why this exists: without
+  // it, a parent re-render that merely recreates a nested instance's
+  // onEvent callback (unavoidable for a repeatOver part rendered via
+  // .map()) replays that instance's last real event again.
+  const hasChildEventForwarding = componentParts.some((p) => p.onChildEvent !== undefined);
+  const forwardedChildEventsLine = hasChildEventForwarding ? "\nconst FORWARDED_CHILD_EVENTS = new WeakSet<object>();\n" : "";
 
   const partsJsx = spec.anatomy
     .filter((p) => p.name !== "root")
     .map((part) => {
       if (part.repeatOver !== undefined) {
-        return repeatedPartJsx(part, componentName);
+        return repeatedComponentPartJsx(part, componentName);
       }
       if (part.submitOnEnter !== undefined) {
         return submitOnEnterPartJsx(part, componentName);
@@ -135,30 +184,7 @@ export function emitComponent(spec: ComponentSpec, outDir: string, filePath: str
         const fillProps = Object.entries(part.slotFill ?? {})
           .map(([slotName, fill]) => `${slotName}={${slotFillExpression(fill)}}`)
           .join(" ");
-        const childEventEntries = Object.entries(part.onChildEvent ?? {});
-        // Delivered through the nested component's own `onEvent` prop (a
-        // machine-level `watch` hook, see emit/machine.ts) — a React
-        // callback, not a DOM event — so it fires whether or not the
-        // nested markup is a DOM descendant of anything, and is unaffected
-        // by the stopPropagation() this same file adds to a component's
-        // own click handling below.
-        //
-        // The forwarded send() is deferred one macrotask (setTimeout 0),
-        // found necessary by testing, not assumed: calling send() on a
-        // DIFFERENT machine instance synchronously — or even microtask-
-        // deferred via queueMicrotask — from inside watch()'s callback
-        // reliably hung the two machines in an infinite mutual-update loop.
-        // A full macrotask tick lets both machines' own reactive flush
-        // cycles settle first. See METRICS.md for the isolated repro.
-        const onEventProp =
-          childEventEntries.length > 0
-            ? ` onEvent={(event) => {\n${childEventEntries
-                .map(
-                  ([childEvent, parentEvent]) =>
-                    `          if (event.type === ${JSON.stringify(childEvent)}) setTimeout(() => service.send({ type: ${JSON.stringify(parentEvent)} } as ${componentName}Schema["event"]), 0);`,
-                )
-                .join("\n")}\n        }}`
-            : "";
+        const onEventProp = onEventForwardingProp(part, componentName);
         return `      <${nestedComponentName}${fillProps ? ` ${fillProps}` : ""}${onEventProp} />`;
       }
       const liveAttr = part.name === liveRegionPart.name && spec.a11y.ariaLive ? ` aria-live=${JSON.stringify(spec.a11y.ariaLive)}` : "";
@@ -226,7 +252,7 @@ import { useMachine } from "@zag-js/react";
 import { ${spec.name} as ${spec.name}Recipe } from "styled-system/recipes";
 import { ${spec.name}Machine } from "./machine";
 import type { ${componentName}Schema } from "./types";${nestedImportsLine}
-
+${forwardedChildEventsLine}
 const STATES = [${stateNames.join(", ")}] as const;
 
 const KEYBOARD_MAP: Record<string, string> = {

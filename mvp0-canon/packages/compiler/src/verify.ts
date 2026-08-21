@@ -37,8 +37,7 @@ export function collectCompletenessIssues(spec: ComponentSpec, _tokens: Record<s
     ...checkTextBindingFields(spec),
     ...checkPartClickEvents(spec),
     ...checkRepeatOverFields(spec),
-    ...checkItemClickEvents(spec),
-    ...checkItemClickPayload(spec),
+    ...checkChildEventPayloadTypes(spec),
     ...checkSubmitOnEnter(spec),
   ];
 }
@@ -63,13 +62,11 @@ function checkVisualCoverage(spec: ComponentSpec): VerificationIssue[] {
       });
       continue;
     }
-    // A "component"-typed part has no style-slot of its own in this recipe —
-    // its styling lives entirely inside its own generated recipe (see
-    // emit/panda-preset.ts), so it's excluded from this spec's coverage. A
-    // `repeatOver` part's `items` template parts get their own slots too
-    // (see emit/panda-preset.ts) and so need coverage of their own.
-    const itemParts = spec.anatomy.flatMap((p) => p.items ?? []);
-    for (const part of [...spec.anatomy.filter((p) => p.element !== undefined), ...itemParts]) {
+    // A "component"-typed part (repeated or not) has no style-slot of its
+    // own in this recipe — its styling lives entirely inside its own
+    // generated recipe (see emit/panda-preset.ts), so it's excluded from
+    // this spec's coverage.
+    for (const part of spec.anatomy.filter((p) => p.element !== undefined)) {
       const partVisual = stateVisual[part.name];
       if (!partVisual || Object.keys(partVisual).length === 0) {
         issues.push({
@@ -203,48 +200,38 @@ function checkTransitionActionFields(spec: ComponentSpec): VerificationIssue[] {
   return issues;
 }
 
-/** Rule: an item-template part's `onClick` must reference a declared event (the item-template counterpart of checkPartClickEvents). */
-function checkItemClickEvents(spec: ComponentSpec): VerificationIssue[] {
-  const eventNames = new Set(spec.events.map((e) => e.name));
-  const issues: VerificationIssue[] = [];
-  for (const part of spec.anatomy) {
-    for (const item of part.items ?? []) {
-      if (item.onClick === undefined) continue;
-      if (!eventNames.has(item.onClick)) {
-        issues.push({
-          rule: "item-click-event-exists",
-          path: `anatomy.${part.name}.items.${item.name}.onClick`,
-          message: `item part "${item.name}" (in "${part.name}") declares onClick "${item.onClick}", which isn't declared in events[] — declared events are: ${[...eventNames].join(", ") || "(none)"}.`,
-        });
-      }
-    }
-  }
-  return issues;
-}
-
-/** Rule: every onClickPayload entry on an item-template part must name a payload field the target event actually declares, of a type the loop variable it's fed from can produce ($index -> "number", $item -> "string"). */
-function checkItemClickPayload(spec: ComponentSpec): VerificationIssue[] {
+/**
+ * Rule: every `onChildEventPayload` entry must name a payload field the
+ * forwarded PARENT event (`onChildEvent[childEvent]`) actually declares, of
+ * a type the loop variable it's fed from can produce ($index -> "number",
+ * $item -> "string"). Key existence (the child event is really forwarded,
+ * the payload field really belongs to that forward) is already enforced by
+ * the schema's own `superRefine`; this is the one cross-reference that
+ * needs `spec.events`, which the schema can't see.
+ */
+function checkChildEventPayloadTypes(spec: ComponentSpec): VerificationIssue[] {
   const eventsByName = new Map(spec.events.map((e) => [e.name, e]));
   const issues: VerificationIssue[] = [];
   for (const part of spec.anatomy) {
-    for (const item of part.items ?? []) {
-      if (item.onClick === undefined || !item.onClickPayload) continue;
-      const event = eventsByName.get(item.onClick);
-      if (!event) continue; // reported by checkItemClickEvents
-      for (const [payloadField, loopRef] of Object.entries(item.onClickPayload)) {
-        const payloadType = event.payload?.[payloadField];
+    if (!part.onChildEventPayload) continue;
+    for (const [childEvent, payloadMap] of Object.entries(part.onChildEventPayload)) {
+      const parentEventName = part.onChildEvent?.[childEvent];
+      if (parentEventName === undefined) continue; // reported by the schema's own superRefine
+      const parentEvent = eventsByName.get(parentEventName);
+      for (const [payloadField, loopRef] of Object.entries(payloadMap)) {
+        const payloadType = parentEvent?.payload?.[payloadField];
         const producedType = loopRef === "$index" ? "number" : "string";
         if (payloadType === undefined) {
           issues.push({
-            rule: "item-click-payload-exists",
-            path: `anatomy.${part.name}.items.${item.name}.onClickPayload.${payloadField}`,
-            message: `item part "${item.name}" (in "${part.name}") fills payload field "${payloadField}" of event "${item.onClick}", which isn't declared in that event's payload — declared payload fields are: ${Object.keys(event.payload ?? {}).join(", ") || "(none)"}.`,
+            rule: "child-event-payload-exists",
+            path: `anatomy.${part.name}.onChildEventPayload.${childEvent}.${payloadField}`,
+            message: `part "${part.name}" fills payload field "${payloadField}" of its own event "${parentEventName}" (forwarded from child event "${childEvent}"), which isn't declared in "${parentEventName}"'s payload — declared payload fields are: ${Object.keys(parentEvent?.payload ?? {}).join(", ") || "(none)"}.`,
           });
         } else if (payloadType !== producedType) {
           issues.push({
-            rule: "item-click-payload-exists",
-            path: `anatomy.${part.name}.items.${item.name}.onClickPayload.${payloadField}`,
-            message: `item part "${item.name}" (in "${part.name}") fills payload field "${payloadField}" (type "${payloadType}") from loop variable "${loopRef}", which produces a "${producedType}" — types don't match.`,
+            rule: "child-event-payload-exists",
+            path: `anatomy.${part.name}.onChildEventPayload.${childEvent}.${payloadField}`,
+            message: `part "${part.name}" fills payload field "${payloadField}" (type "${payloadType}") of its own event "${parentEventName}" from loop variable "${loopRef}", which produces a "${producedType}" — types don't match.`,
           });
         }
       }

@@ -99,6 +99,19 @@
                     "field"
                   ],
                   "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "loopItem"
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ],
+                  "additionalProperties": false
                 }
               ]
             }
@@ -112,6 +125,27 @@
             "additionalProperties": {
               "type": "string",
               "minLength": 1
+            }
+          },
+          "onChildEventPayload": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "minLength": 1
+            },
+            "additionalProperties": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string",
+                "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "$item",
+                  "$index"
+                ]
+              }
             }
           },
           "onClick": {
@@ -129,58 +163,6 @@
           "repeatOver": {
             "type": "string",
             "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
-          },
-          "items": {
-            "minItems": 1,
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "name": {
-                  "type": "string",
-                  "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
-                },
-                "element": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "itemTextBinding": {
-                  "type": "string",
-                  "const": "$item"
-                },
-                "text": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "ariaLabel": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "onClick": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "onClickPayload": {
-                  "type": "object",
-                  "propertyNames": {
-                    "type": "string",
-                    "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
-                  },
-                  "additionalProperties": {
-                    "type": "string",
-                    "enum": [
-                      "$item",
-                      "$index"
-                    ]
-                  }
-                }
-              },
-              "required": [
-                "name",
-                "element"
-              ],
-              "additionalProperties": false
-            }
           },
           "submitOnEnter": {
             "type": "object",

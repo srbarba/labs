@@ -8,6 +8,8 @@ import { notificationButtonMachine } from "./machine";
 import type { NotificationButtonSchema } from "./types";
 import { StatusChip } from "../statusChip/statusChip";
 
+const FORWARDED_CHILD_EVENTS = new WeakSet<object>();
+
 const STATES = ["default", "active"] as const;
 
 const KEYBOARD_MAP: Record<string, string> = {
@@ -65,7 +67,10 @@ export const NotificationButton = forwardRef<NotificationButtonHandle, Notificat
     >
       <span className={classes.label}>{props.label}</span>
       <StatusChip content={service.context.get("statusBadgeText")} onEvent={(event) => {
-          if (event.type === "CLICK") setTimeout(() => service.send({ type: "CLICK" } as NotificationButtonSchema["event"]), 0);
+          if (event.type === "CLICK" && !FORWARDED_CHILD_EVENTS.has(event)) {
+            FORWARDED_CHILD_EVENTS.add(event);
+            setTimeout(() => service.send({ type: "CLICK" } as NotificationButtonSchema["event"]), 0);
+          }
         }} />
     </button>
   );

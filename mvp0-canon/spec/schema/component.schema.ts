@@ -9,76 +9,33 @@ import { z } from "zod";
 const identifier = z.string().regex(/^[a-zA-Z][a-zA-Z0-9]*$/, "must be a camelCase identifier");
 
 /**
+ * Loop-variable reference usable only on a `repeatOver` part (see below):
+ * `$item` is the current array element (a string), `$index` its position.
+ * Kept as an enum tag, not a free string, so it stays data — never an
+ * expression — matching this file's own rule.
+ */
+const LoopRef = z.enum(["$item", "$index"]);
+
+/**
  * How a `component`-typed anatomy part fills one of the referenced
  * component's declared `contentSlot` parts. Kept as plain data (a tagged
- * literal, a forwarding marker, or a reference to this spec's own context
- * field) — never an expression — matching this file's own rule that a spec
- * is data, not code.
+ * literal, a forwarding marker, a reference to this spec's own context
+ * field, or — only on a `repeatOver` part — the current loop element) —
+ * never an expression — matching this file's own rule that a spec is data,
+ * not code.
+ *
+ * `"loopItem"` is only meaningful (and only accepted by verify.ts) on a
+ * `repeatOver` part: it fills the slot with the current array element
+ * (`$item`) of the loop that part iterates over — the composition
+ * counterpart of `AnatomyPart.textBinding`, for a NESTED component's slot
+ * instead of this spec's own DOM.
  */
 const SlotFillValue = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("text"), value: z.string() }).strict(),
   z.object({ kind: z.literal("children") }).strict(),
   z.object({ kind: z.literal("contextRef"), field: identifier }).strict(),
+  z.object({ kind: z.literal("loopItem") }).strict(),
 ]);
-
-/**
- * Loop-variable reference usable only inside an `items` template (see
- * `repeatOver` below): `$item` is the current array element (a string),
- * `$index` its position. Kept as an enum tag, not a free string, so it
- * stays data — never an expression — matching this file's own rule.
- */
-const LoopRef = z.enum(["$item", "$index"]);
-
-/**
- * The per-element template rendered once for every entry of the array
- * context field a `repeatOver` part iterates over. Deliberately a smaller,
- * non-recursive sibling of `AnatomyPart` (no `component`, no nested
- * `repeatOver`, no `contentSlot`) — one level of repetition is what this
- * MVP's falsification target needs (see spec/components/input-tags.spec.json),
- * not a general nested-list mechanism; see RESULTS.md for what that leaves out.
- *
- * `itemTextBinding: "$item"` renders the current array element's own string
- * value — the item-template counterpart of `AnatomyPart.textBinding`. `text`
- * is the item-template counterpart of `SlotFillValue`'s `"text"` kind: a
- * fixed literal (e.g. a "×" glyph on a delete-trigger button), never both
- * with `itemTextBinding` on the same item part. `ariaLabel`, similarly a
- * fixed literal, is what gives a glyph-only item part (like that same
- * delete-trigger) an accessible name — found necessary, not assumed: see
- * RESULTS.md.
- *
- * `onClick`/`onClickPayload` mirror `AnatomyPart.onClick`, except the
- * dispatched event's payload is built from the loop variables: each
- * `onClickPayload` entry names one of the target event's declared payload
- * fields and says which loop variable fills it (e.g. `{"index": "$index"}`
- * for a per-item delete button).
- */
-const AnatomyItemPart = z
-  .object({
-    name: identifier,
-    element: z.string().min(1),
-    itemTextBinding: z.literal("$item").optional(),
-    text: z.string().min(1).optional(),
-    ariaLabel: z.string().min(1).optional(),
-    onClick: z.string().min(1).optional(),
-    onClickPayload: z.record(identifier, LoopRef).optional(),
-  })
-  .strict()
-  .superRefine((item, ctx) => {
-    if (item.onClickPayload !== undefined && item.onClick === undefined) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["onClickPayload"],
-        message: `item part "${item.name}" declares onClickPayload but no "onClick" — onClickPayload only fills the payload of the event onClick dispatches.`,
-      });
-    }
-    if (item.itemTextBinding !== undefined && item.text !== undefined) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["text"],
-        message: `item part "${item.name}" declares both itemTextBinding and text — a part's content can only come from one source.`,
-      });
-    }
-  });
 
 /**
  * A part is either a native DOM element (`element`) or an instance of
@@ -101,6 +58,15 @@ const AnatomyItemPart = z
  * not the DOM, so it works whether or not the nested markup happens to be
  * a DOM descendant of anything that would otherwise catch a bubbled click.
  *
+ * `onChildEventPayload` only applies alongside `repeatOver` (see below): for
+ * one of the child event names already mapped in `onChildEvent`, it says
+ * which loop variable fills which field of the forwarded PARENT event's
+ * payload (e.g. `{"REMOVE": {"index": "$index"}}` — "when the Nth nested
+ * instance's REMOVE fires, forward my own event with index: N"). Without
+ * this a repeated nested instance has no way to tell the parent WHICH of
+ * the N instances raised the event — the instance itself only knows its own
+ * (empty) event, never its position in the loop.
+ *
  * `onClick` is the general mechanism for a native part *other than* `root`
  * to dispatch one of this spec's own declared events on click — `root`
  * keeps its own separate, older convention (a bare `CLICK` event wired
@@ -114,13 +80,17 @@ const AnatomyItemPart = z
  * to `contentSlot` (content decided by the caller) or `slotFill`'s
  * `contextRef` (this spec's context forwarded into a NESTED component).
  *
- * `repeatOver` + `items` render this native part once per element of a
- * declared `stringList` context field, instead of once — the mechanism a
+ * `repeatOver` renders a `component` part once per element of a declared
+ * `stringList` context field, instead of once — the mechanism a
  * collection-shaped component (e.g. the tags in an input-tags widget) needs
- * to turn "one array in context" into "N independently-interactive DOM
- * nodes." `items` is the per-element template (see `AnatomyItemPart`); a
- * `repeatOver` part is otherwise a plain wrapper element and may not also
- * declare `textBinding`, `contentSlot`, `onClick`, or `component`.
+ * to turn "one array in context" into "N independently-interactive nested
+ * component instances," each a real, separately-composed component (its own
+ * spec, its own machine, its own events) rather than an inline template.
+ * `repeatOver` is ONLY valid on a `component` part — a native `element`
+ * repeated with nothing to put inside it isn't useful, and (unlike an
+ * ordinary single `component` part) `slotFill` may use `"loopItem"` to feed
+ * each instance the current array element, and `onChildEventPayload` to
+ * tell the parent WHICH instance raised a forwarded event.
  *
  * `submitOnEnter` marks a native (typically `input`) part as an uncontrolled
  * text field that, on Enter, reads its own current DOM value, dispatches
@@ -138,11 +108,11 @@ const AnatomyPart = z
     contentSlot: z.object({ required: z.boolean().optional().default(true) }).optional(),
     slotFill: z.record(identifier, SlotFillValue).optional(),
     onChildEvent: z.record(z.string().min(1), z.string().min(1)).optional(),
+    onChildEventPayload: z.record(z.string().min(1), z.record(identifier, LoopRef)).optional(),
     onClick: z.string().min(1).optional(),
     textBinding: identifier.optional(),
     ariaLabel: z.string().min(1).optional(),
     repeatOver: identifier.optional(),
-    items: z.array(AnatomyItemPart).min(1).optional(),
     submitOnEnter: z.object({ event: z.string().min(1), payloadField: identifier }).strict().optional(),
   })
   .strict()
@@ -201,29 +171,49 @@ const AnatomyPart = z
       });
     }
     const hasRepeat = part.repeatOver !== undefined;
-    const hasItems = part.items !== undefined;
-    if (hasRepeat !== hasItems) {
+    if (hasRepeat && !hasComponent) {
       ctx.addIssue({
         code: "custom",
         path: ["repeatOver"],
-        message: `anatomy part "${part.name}" must declare both "repeatOver" and "items" together, or neither (has ${
-          hasRepeat ? "repeatOver only" : "items only"
-        }).`,
+        message: `anatomy part "${part.name}" declares repeatOver but has no "component" reference — repeatOver only applies to a component part (one nested instance per array element).`,
       });
     }
-    if (hasRepeat && hasComponent) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["repeatOver"],
-        message: `anatomy part "${part.name}" declares repeatOver but has a "component" reference — a repeated part must be a native element.`,
-      });
+    if (part.onChildEventPayload !== undefined) {
+      if (part.onChildEvent === undefined) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["onChildEventPayload"],
+          message: `anatomy part "${part.name}" declares onChildEventPayload but no "onChildEvent" — onChildEventPayload only adds payload to an event onChildEvent already forwards.`,
+        });
+      }
+      if (!hasRepeat) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["onChildEventPayload"],
+          message: `anatomy part "${part.name}" declares onChildEventPayload but no "repeatOver" — its loop variables ($item/$index) only exist inside a repeated part.`,
+        });
+      }
+      const forwardedEvents = new Set(Object.keys(part.onChildEvent ?? {}));
+      for (const childEvent of Object.keys(part.onChildEventPayload)) {
+        if (!forwardedEvents.has(childEvent)) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["onChildEventPayload", childEvent],
+            message: `anatomy part "${part.name}" declares onChildEventPayload for "${childEvent}", which onChildEvent doesn't forward — declared forwards are: ${[...forwardedEvents].join(", ") || "(none)"}.`,
+          });
+        }
+      }
     }
-    if (hasRepeat && (part.textBinding !== undefined || part.contentSlot !== undefined || part.onClick !== undefined)) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["repeatOver"],
-        message: `anatomy part "${part.name}" declares repeatOver together with textBinding/contentSlot/onClick — a repeated wrapper part can only have "items", nothing else.`,
-      });
+    if (part.slotFill !== undefined && !hasRepeat) {
+      for (const [slotName, fill] of Object.entries(part.slotFill)) {
+        if (fill.kind === "loopItem") {
+          ctx.addIssue({
+            code: "custom",
+            path: ["slotFill", slotName],
+            message: `anatomy part "${part.name}" fills slot "${slotName}" with "loopItem" but has no "repeatOver" — loopItem only exists inside a repeated part.`,
+          });
+        }
+      }
     }
     if (part.submitOnEnter !== undefined) {
       if (!hasElement) {
@@ -362,5 +352,4 @@ export type ContextField = z.infer<typeof ContextField>;
 export type SlotFillValue = z.infer<typeof SlotFillValue>;
 export type ContextAction = z.infer<typeof ContextAction>;
 export type ContextActionSource = z.infer<typeof ContextActionSource>;
-export type AnatomyItemPart = z.infer<typeof AnatomyItemPart>;
 export type LoopRef = z.infer<typeof LoopRef>;

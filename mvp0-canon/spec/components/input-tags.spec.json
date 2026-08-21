@@ -1,23 +1,18 @@
 {
   "name": "inputTags",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "anatomy": [
     { "name": "root", "element": "div", "role": "group" },
     {
-      "name": "item",
-      "element": "span",
+      "name": "tag",
+      "component": "tag",
       "repeatOver": "tags",
-      "items": [
-        { "name": "itemText", "element": "span", "itemTextBinding": "$item" },
-        {
-          "name": "itemDeleteTrigger",
-          "element": "button",
-          "text": "×",
-          "ariaLabel": "Remove tag",
-          "onClick": "REMOVE_TAG",
-          "onClickPayload": { "index": "$index" }
-        }
-      ]
+      "slotFill": {
+        "label": { "kind": "loopItem" },
+        "deleteTrigger": { "kind": "text", "value": "×" }
+      },
+      "onChildEvent": { "REMOVE": "REMOVE_TAG" },
+      "onChildEventPayload": { "REMOVE": { "index": "$index" } }
     },
     {
       "name": "input",
@@ -53,9 +48,6 @@
   "visual": {
     "active": {
       "root": { "backgroundColor": "color.inputTags.active.bg", "borderColor": "color.inputTags.active.border" },
-      "item": { "backgroundColor": "color.inputTags.active.itemBg", "borderColor": "color.inputTags.active.itemBorder" },
-      "itemText": { "color": "color.inputTags.active.itemFg" },
-      "itemDeleteTrigger": { "backgroundColor": "color.inputTags.active.itemBg", "color": "color.inputTags.active.itemFg" },
       "input": { "color": "color.inputTags.active.fg", "backgroundColor": "color.inputTags.active.bg" }
     }
   },

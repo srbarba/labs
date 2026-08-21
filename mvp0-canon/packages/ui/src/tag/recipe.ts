@@ -1,4 +1,4 @@
-// GENERATED — DO NOT EDIT. Source: spec/components/input-tags.spec.json
+// GENERATED — DO NOT EDIT. Source: spec/components/tag.spec.json
 
 import { defineSlotRecipe } from "@pandacss/dev";
 
@@ -11,19 +11,19 @@ import { defineSlotRecipe } from "@pandacss/dev";
  * so two components never collide on the same "<name>.gap" token. See
  * METRICS.md, Fase 4, for why layout itself isn't spec-derived.
  */
-export const inputTagsRecipe = defineSlotRecipe({
-  className: "inputTags-generated",
-  slots: ["root", "input"],
+export const tagRecipe = defineSlotRecipe({
+  className: "tag-generated",
+  slots: ["root", "label", "deleteTrigger"],
   base: {
     root: {
       display: "inline-flex",
       alignItems: "center",
       justifyContent: "center",
-      gap: "inputTags.gap",
-      paddingInline: "inputTags.paddingX",
-      paddingBlock: "inputTags.paddingY",
-      borderRadius: "inputTags",
-      fontSize: "inputTags",
+      gap: "tag.gap",
+      paddingInline: "tag.paddingX",
+      paddingBlock: "tag.paddingY",
+      borderRadius: "tag",
+      fontSize: "tag",
       fontWeight: "medium",
       borderWidth: "1px",
       borderStyle: "solid",
@@ -36,12 +36,27 @@ export const inputTagsRecipe = defineSlotRecipe({
     state: {
       active: {
         root: {
-          backgroundColor: "inputTags.active.bg",
-          borderColor: "inputTags.active.border",
+          backgroundColor: "tag.active.bg",
+          borderColor: "tag.active.border",
         },
-        input: {
-          color: "inputTags.active.fg",
-          backgroundColor: "inputTags.active.bg",
+        label: {
+          color: "tag.active.fg",
+        },
+        deleteTrigger: {
+          backgroundColor: "tag.active.bg",
+          color: "tag.active.fg",
+        },
+      },
+      removed: {
+        root: {
+          backgroundColor: "tag.active.bg",
+        },
+        label: {
+          color: "tag.active.fg",
+        },
+        deleteTrigger: {
+          backgroundColor: "tag.active.bg",
+          color: "tag.active.fg",
         },
       },
     },

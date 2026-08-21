@@ -1,0 +1,86 @@
+{
+  "name": "tag",
+  "version": "0.1.0",
+  "anatomy": [
+    {
+      "name": "root",
+      "element": "span"
+    },
+    {
+      "name": "label",
+      "element": "span",
+      "contentSlot": {
+        "required": true
+      }
+    },
+    {
+      "name": "deleteTrigger",
+      "element": "button",
+      "ariaLabel": "Remove tag",
+      "contentSlot": {
+        "required": true
+      },
+      "onClick": "REMOVE"
+    }
+  ],
+  "states": [
+    {
+      "name": "active",
+      "description": "Ready, not yet asked to be removed",
+      "initial": true
+    },
+    {
+      "name": "removed",
+      "description": "Asked to be removed (terminal)",
+      "final": true
+    }
+  ],
+  "transitions": [
+    {
+      "from": "active",
+      "event": "REMOVE",
+      "to": "removed"
+    }
+  ],
+  "events": [
+    {
+      "name": "REMOVE"
+    }
+  ],
+  "context": [],
+  "visual": {
+    "active": {
+      "root": {
+        "backgroundColor": "color.tag.active.bg",
+        "borderColor": "color.tag.active.border"
+      },
+      "label": {
+        "color": "color.tag.active.fg"
+      },
+      "deleteTrigger": {
+        "backgroundColor": "color.tag.active.bg",
+        "color": "color.tag.active.fg"
+      }
+    },
+    "removed": {
+      "root": {
+        "backgroundColor": "color.tag.active.bg"
+      },
+      "label": {
+        "color": "color.tag.active.fg"
+      },
+      "deleteTrigger": {
+        "backgroundColor": "color.tag.active.bg",
+        "color": "color.tag.active.fg"
+      }
+    }
+  },
+  "a11y": {
+    "role": "group",
+    "focusBehaviour": {
+      "active": "retain",
+      "removed": "none"
+    },
+    "keyboard": {}
+  }
+}

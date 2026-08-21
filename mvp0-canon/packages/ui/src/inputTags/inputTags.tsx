@@ -5,6 +5,9 @@ import { useMachine } from "@zag-js/react";
 import { inputTags as inputTagsRecipe } from "styled-system/recipes";
 import { inputTagsMachine } from "./machine";
 import type { InputTagsSchema } from "./types";
+import { Tag } from "../tag/tag";
+
+const FORWARDED_CHILD_EVENTS = new WeakSet<object>();
 
 const STATES = ["active"] as const;
 
@@ -55,13 +58,12 @@ export const InputTags = forwardRef<InputTagsHandle, InputTagsProps>(function In
       onKeyDown={handleKeyDown}
     >
       {(service.context.get("tags") as string[]).map((item: string, index: number) => (
-        <span key={index} className={classes.item}>
-        <span className={classes.itemText}>{item}</span>
-        <button type="button" aria-label="Remove tag" className={classes.itemDeleteTrigger} onClick={(event) => {
-          event.stopPropagation();
-          service.send({ type: "REMOVE_TAG", index: index } as InputTagsSchema["event"]);
-        }}>×</button>
-        </span>
+        <Tag key={index} label={item} deleteTrigger={"×"} onEvent={(event) => {
+          if (event.type === "REMOVE" && !FORWARDED_CHILD_EVENTS.has(event)) {
+            FORWARDED_CHILD_EVENTS.add(event);
+            setTimeout(() => service.send({ type: "REMOVE_TAG", index: index } as InputTagsSchema["event"]), 0);
+          }
+        }} />
       ))}
       <input
         className={classes.input}

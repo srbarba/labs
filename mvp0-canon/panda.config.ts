@@ -13,6 +13,8 @@ import { counterTokens } from "./packages/ui/src/counter/tokens";
 import { counterRecipe } from "./packages/ui/src/counter/recipe";
 import { inputTagsTokens } from "./packages/ui/src/inputTags/tokens";
 import { inputTagsRecipe } from "./packages/ui/src/inputTags/recipe";
+import { tagTokens } from "./packages/ui/src/tag/tokens";
+import { tagRecipe } from "./packages/ui/src/tag/recipe";
 
 /**
  * Hand-written app-level wiring — NOT generated. It stays editable across
@@ -50,7 +52,7 @@ export default defineConfig({
   outdir: "styled-system",
   theme: {
     extend: {
-      tokens: mergeTokenSets(actionButtonTokens, statusChipTokens, notificationButtonTokens, counterTokens, inputTagsTokens),
+      tokens: mergeTokenSets(actionButtonTokens, statusChipTokens, notificationButtonTokens, counterTokens, inputTagsTokens, tagTokens),
       slotRecipes: {
         actionButtonManual: actionButtonManualRecipe,
         actionButton: actionButtonRecipe,
@@ -58,6 +60,7 @@ export default defineConfig({
         notificationButton: notificationButtonRecipe,
         counter: counterRecipe,
         inputTags: inputTagsRecipe,
+        tag: tagRecipe,
       },
     },
   },

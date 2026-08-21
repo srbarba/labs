@@ -74,21 +74,17 @@ function toPandaTokenRef(dtcgRef: string): string {
 }
 
 function emitRecipe(spec: ComponentSpec, filePath: string): string {
-  // A "component"-typed part (nests another generated component) has no
-  // style-slot of its own here — its styling lives entirely inside its own
-  // recipe. Only native ("element") parts get a Panda slot in this recipe.
-  // A `repeatOver` part's own `items` template parts are declared in a
-  // separate array (AnatomyItemPart, not AnatomyPart), so they need their
-  // slot names folded in explicitly — the repeated wrapper itself is
-  // already a native `element` and picked up by the filter above it.
+  // A "component"-typed part (nests another generated component, once or —
+  // via repeatOver — N times) has no style-slot of its own here — its
+  // styling lives entirely inside its own recipe. Only native ("element")
+  // parts get a Panda slot in this recipe.
   const styledParts = spec.anatomy.filter((p) => p.element !== undefined);
-  const itemParts = spec.anatomy.flatMap((p) => p.items ?? []);
-  const slots = [...styledParts.map((p) => p.name), ...itemParts.map((p) => p.name)].map((name) => JSON.stringify(name)).join(", ");
+  const slots = styledParts.map((p) => JSON.stringify(p.name)).join(", ");
 
   const variantEntries = spec.states
     .map((state) => {
       const stateVisual = spec.visual[state.name] ?? {};
-      const partEntries = [...styledParts, ...itemParts]
+      const partEntries = styledParts
         .map((part) => {
           const partVisual = stateVisual[part.name] ?? {};
           const propLines = Object.entries(partVisual)
