@@ -150,4 +150,25 @@ describe("ComponentSpec schema — anatomy composition (element vs. component, c
     const result = ComponentSpec.safeParse(spec);
     expect(result.success).toBe(true);
   });
+
+  it("accepts a component part with onChildEvent", () => {
+    const spec = {
+      ...validExample,
+      anatomy: [
+        ...validExample.anatomy,
+        { name: "badge", component: "statusChip", onChildEvent: { CLICK: "TOGGLE" } },
+      ],
+    };
+    const result = ComponentSpec.safeParse(spec);
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects onChildEvent on a part that has element instead of component", () => {
+    const spec = {
+      ...validExample,
+      anatomy: [{ name: "root", element: "button", onChildEvent: { CLICK: "TOGGLE" } }],
+    };
+    const result = ComponentSpec.safeParse(spec);
+    expect(result.success).toBe(false);
+  });
 });

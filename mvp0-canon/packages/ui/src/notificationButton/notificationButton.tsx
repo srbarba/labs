@@ -20,6 +20,8 @@ export interface NotificationButtonProps {
   statusBadgeText?: string;
   /** Fires whenever the underlying state changes — the extension point business logic (e.g. wiring an async action) hooks into, since the spec has no way to express "call this callback and feed its result back as an event." */
   onStateChange?: (state: NotificationButtonSchema["state"]) => void;
+  /** Fires with the raw event object whenever this component's machine processes ANY event — the general escape hatch a composing parent's onChildEvent wiring uses to react to this component's own events without relying on DOM bubbling. */
+  onEvent?: (event: { type: string } & Record<string, any>) => void;
 }
 
 export interface NotificationButtonHandle {
@@ -27,8 +29,8 @@ export interface NotificationButtonHandle {
 }
 
 export const NotificationButton = forwardRef<NotificationButtonHandle, NotificationButtonProps>(function NotificationButton(props, ref) {
-  const { statusBadgeText, onStateChange } = props;
-  const service = useMachine(notificationButtonMachine, { statusBadgeText } as Partial<NotificationButtonSchema["props"]>);
+  const { statusBadgeText, onStateChange, onEvent } = props;
+  const service = useMachine(notificationButtonMachine, { statusBadgeText, onEvent } as Partial<NotificationButtonSchema["props"]>);
 
   useImperativeHandle(ref, () => ({ send: service.send }), [service]);
 
@@ -55,11 +57,16 @@ export const NotificationButton = forwardRef<NotificationButtonHandle, Notificat
       className={classes.root}
       role={"button"}
       data-state={state}
-      onClick={() => service.send({ type: "CLICK" } as NotificationButtonSchema["event"])}
+      onClick={(event) => {
+        event.stopPropagation();
+        service.send({ type: "CLICK" } as NotificationButtonSchema["event"]);
+      }}
       onKeyDown={handleKeyDown}
     >
       <span className={classes.label}>{props.label}</span>
-      <StatusChip content={service.context.get("statusBadgeText")} />
+      <StatusChip content={service.context.get("statusBadgeText")} onEvent={(event) => {
+          if (event.type === "CLICK") setTimeout(() => service.send({ type: "CLICK" } as NotificationButtonSchema["event"]), 0);
+        }} />
     </button>
   );
 });

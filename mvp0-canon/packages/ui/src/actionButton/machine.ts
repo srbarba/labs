@@ -52,6 +52,9 @@ export const actionButtonMachine = createMachine({
       },
     },
   },
+  watch({ prop, event }) {
+    prop("onEvent")?.(event.current());
+  },
   implementations: {
     guards: {
       notDisabled: ({ context }) => !context.get("disabled"),

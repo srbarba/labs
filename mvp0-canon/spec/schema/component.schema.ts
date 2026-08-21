@@ -33,6 +33,14 @@ const SlotFillValue = z.discriminatedUnion("kind", [
  *
  * `slotFill` is only meaningful on a `component` part: it says what fills
  * each `contentSlot` the referenced component declares.
+ *
+ * `onChildEvent` is the mirror-image of `slotFill`, going the other
+ * direction: a `component` part can map one of the referenced component's
+ * own declared event names to one of THIS spec's own event names — "when
+ * the nested instance processes event X, send my own event Y." It's
+ * delivered through a machine-level hook (see emit/machine.ts's `watch`),
+ * not the DOM, so it works whether or not the nested markup happens to be
+ * a DOM descendant of anything that would otherwise catch a bubbled click.
  */
 const AnatomyPart = z
   .object({
@@ -42,6 +50,7 @@ const AnatomyPart = z
     role: z.string().optional(),
     contentSlot: z.object({ required: z.boolean().optional().default(true) }).optional(),
     slotFill: z.record(identifier, SlotFillValue).optional(),
+    onChildEvent: z.record(z.string().min(1), z.string().min(1)).optional(),
   })
   .strict()
   .superRefine((part, ctx) => {
@@ -61,6 +70,13 @@ const AnatomyPart = z
         code: "custom",
         path: ["slotFill"],
         message: `anatomy part "${part.name}" declares slotFill but has no "component" reference — slotFill only applies to component parts.`,
+      });
+    }
+    if (hasElement && part.onChildEvent !== undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["onChildEvent"],
+        message: `anatomy part "${part.name}" declares onChildEvent but has no "component" reference — onChildEvent only applies to component parts.`,
       });
     }
     if (hasComponent && part.contentSlot !== undefined) {

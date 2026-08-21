@@ -26,6 +26,9 @@ export const notificationButtonMachine = createMachine({
       },
     },
   },
+  watch({ prop, event }) {
+    prop("onEvent")?.(event.current());
+  },
   implementations: {
 
   },

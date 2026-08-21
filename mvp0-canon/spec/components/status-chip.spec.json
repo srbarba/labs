@@ -10,12 +10,11 @@
     { "name": "highlighted", "description": "Con énfasis visual" }
   ],
   "transitions": [
-    { "from": "default", "event": "HIGHLIGHT", "to": "highlighted" },
-    { "from": "highlighted", "event": "RESET", "to": "default" }
+    { "from": "default", "event": "CLICK", "to": "highlighted" },
+    { "from": "highlighted", "event": "CLICK", "to": "default" }
   ],
   "events": [
-    { "name": "HIGHLIGHT" },
-    { "name": "RESET" }
+    { "name": "CLICK" }
   ],
   "context": [],
   "visual": {

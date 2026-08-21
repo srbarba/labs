@@ -89,7 +89,7 @@ describe("emitComponent — anatomy composition and content-projection slots", (
       }),
     );
     expect(source).toContain("children: string;");
-    expect(source).toContain("const { children, onStateChange } = props;");
+    expect(source).toContain("const { children, onStateChange, onEvent } = props;");
     expect(source).toContain("<Badge content={children} />");
   });
 
@@ -105,7 +105,7 @@ describe("emitComponent — anatomy composition and content-projection slots", (
     );
     // `count` is still destructured from props — it feeds useMachine's construction props — but the
     // JSX itself reads service.context.get("count"), which has the spec's default already applied.
-    expect(source).toContain("const { count, onStateChange } = props;");
+    expect(source).toContain("const { count, onStateChange, onEvent } = props;");
     expect(source).toContain('<Badge content={service.context.get("count")} />');
   });
 

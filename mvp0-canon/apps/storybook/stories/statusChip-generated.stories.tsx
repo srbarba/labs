@@ -31,5 +31,11 @@ type Story = StoryObj<typeof StatusChipStory>;
 
 export const Default: Story = {};
 
-// "highlighted" is reachable per the spec's transition graph but this generator found no click/keyboard/prop path to it automatically.
-export const Highlighted: Story = {};
+export const Highlighted: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const button = canvas.getByRole("status");
+    await userEvent.click(button);
+    await waitFor(() => expect(button).toHaveAttribute("data-state", "highlighted"));
+  },
+};

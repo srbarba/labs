@@ -63,7 +63,31 @@ export function emitComponent(spec: ComponentSpec, outDir: string, filePath: str
         const fillProps = Object.entries(part.slotFill ?? {})
           .map(([slotName, fill]) => `${slotName}={${slotFillExpression(fill)}}`)
           .join(" ");
-        return `      <${nestedComponentName}${fillProps ? ` ${fillProps}` : ""} />`;
+        const childEventEntries = Object.entries(part.onChildEvent ?? {});
+        // Delivered through the nested component's own `onEvent` prop (a
+        // machine-level `watch` hook, see emit/machine.ts) — a React
+        // callback, not a DOM event — so it fires whether or not the
+        // nested markup is a DOM descendant of anything, and is unaffected
+        // by the stopPropagation() this same file adds to a component's
+        // own click handling below.
+        //
+        // The forwarded send() is deferred one macrotask (setTimeout 0),
+        // found necessary by testing, not assumed: calling send() on a
+        // DIFFERENT machine instance synchronously — or even microtask-
+        // deferred via queueMicrotask — from inside watch()'s callback
+        // reliably hung the two machines in an infinite mutual-update loop.
+        // A full macrotask tick lets both machines' own reactive flush
+        // cycles settle first. See METRICS.md for the isolated repro.
+        const onEventProp =
+          childEventEntries.length > 0
+            ? ` onEvent={(event) => {\n${childEventEntries
+                .map(
+                  ([childEvent, parentEvent]) =>
+                    `          if (event.type === ${JSON.stringify(childEvent)}) setTimeout(() => service.send({ type: ${JSON.stringify(parentEvent)} } as ${componentName}Schema["event"]), 0);`,
+                )
+                .join("\n")}\n        }}`
+            : "";
+        return `      <${nestedComponentName}${fillProps ? ` ${fillProps}` : ""}${onEventProp} />`;
       }
       const liveAttr = part.name === liveRegionPart.name && spec.a11y.ariaLive ? ` aria-live=${JSON.stringify(spec.a11y.ariaLive)}` : "";
       // contentSlot is the general mechanism; the "label"-name convention is a legacy fallback kept for pre-existing specs (see legacyLabelPart above).
@@ -73,8 +97,9 @@ export function emitComponent(spec: ComponentSpec, outDir: string, filePath: str
     .join("\n");
 
   const contextFieldNames = spec.context.map((c) => c.name);
-  const destructuredNames = [...(needsChildrenProp ? ["children"] : []), ...contextFieldNames, "onStateChange"];
-  const machineProps = contextFieldNames.length > 0 ? `{ ${contextFieldNames.join(", ")} }` : "{}";
+  const destructuredNames = [...(needsChildrenProp ? ["children"] : []), ...contextFieldNames, "onStateChange", "onEvent"];
+  const machinePropEntries = [...contextFieldNames, "onEvent"];
+  const machineProps = `{ ${machinePropEntries.join(", ")} }`;
 
   const hasClickEvent = spec.events.some((e) => e.name === "CLICK");
   const hasPendingState = spec.states.some((s) => s.name === "pending");
@@ -90,8 +115,17 @@ export function emitComponent(spec: ComponentSpec, outDir: string, filePath: str
 
   const ariaBusyLine = hasPendingState ? '      aria-busy={state === "pending"}\n' : "";
   const disabledAttrLine = hasDisabledState ? '      disabled={state === "disabled"}\n' : "";
+  // stopPropagation isolates this component's own click handling from any
+  // ancestor's unrelated onClick (e.g. a parent this component might be
+  // nested inside) — a composing parent that wants to react to THIS click
+  // must opt in explicitly via onChildEvent (see the onEvent wiring above),
+  // not rely on an accidental DOM bubble.
   const onClickLine = hasClickEvent
-    ? `      onClick={() => service.send({ type: "CLICK" } as ${componentName}Schema["event"])}\n`
+    ? `      onClick={(event) => {
+        event.stopPropagation();
+        service.send({ type: "CLICK" } as ${componentName}Schema["event"]);
+      }}
+`
     : "";
 
   const source = `${GENERATED_HEADER(filePath)}
@@ -111,6 +145,8 @@ export interface ${componentName}Props {
 ${propsFields}
   /** Fires whenever the underlying state changes — the extension point business logic (e.g. wiring an async action) hooks into, since the spec has no way to express "call this callback and feed its result back as an event." */
   onStateChange?: (state: ${componentName}Schema["state"]) => void;
+  /** Fires with the raw event object whenever this component's machine processes ANY event — the general escape hatch a composing parent's onChildEvent wiring uses to react to this component's own events without relying on DOM bubbling. */
+  onEvent?: (event: { type: string } & Record<string, any>) => void;
 }
 
 export interface ${componentName}Handle {

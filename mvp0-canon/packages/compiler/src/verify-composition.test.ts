@@ -58,7 +58,7 @@ describe("verify-composition — a valid nested pair passes cleanly", () => {
   });
 });
 
-describe("verify-composition — six ways to break composition produce six distinct, actionable rules", () => {
+describe("verify-composition — eight ways to break composition produce eight distinct, actionable rules", () => {
   it("rule: component-reference-exists — referencing an undeclared component", () => {
     const widget = spec({
       name: "widget",
@@ -117,11 +117,35 @@ describe("verify-composition — six ways to break composition produce six disti
     expect(issues.some((i) => i.rule === "slot-fill-context-ref-exists")).toBe(true);
   });
 
-  it("all six rules produce distinct, non-empty messages across the broken fixtures", () => {
+  it("rule: child-event-unknown-key — onChildEvent key isn't an event the referenced component declares", () => {
+    const widget = spec({
+      name: "widget",
+      anatomy: [
+        { name: "root", element: "div" },
+        { name: "badgePart", component: "badge", onChildEvent: { NOPE: "EV" } },
+      ],
+    });
+    const issues = collectCompositionIssues(registry([badge, widget]));
+    expect(issues.some((i) => i.rule === "child-event-unknown-key")).toBe(true);
+  });
+
+  it("rule: child-event-target-unknown — onChildEvent value isn't an event the referencing spec declares itself", () => {
+    const widget = spec({
+      name: "widget",
+      anatomy: [
+        { name: "root", element: "div" },
+        { name: "badgePart", component: "badge", onChildEvent: { EV: "NOPE" } },
+      ],
+    });
+    const issues = collectCompositionIssues(registry([badge, widget]));
+    expect(issues.some((i) => i.rule === "child-event-target-unknown")).toBe(true);
+  });
+
+  it("all eight rules produce distinct, non-empty messages across the broken fixtures", () => {
     // Note: some fixtures legitimately trigger more than one rule at once
     // (e.g. an unfilled required slot on a root-part-native violation) —
     // that's the same "surface everything in one run" philosophy verify.ts
-    // already uses, not a bug. This test only checks that each of the six
+    // already uses, not a bug. This test only checks that each of the eight
     // rule ids is reachable and that no two rules ever produce the same
     // message text.
     const messagesByRule = new Map<string, Set<string>>();
@@ -135,6 +159,8 @@ describe("verify-composition — six ways to break composition produce six disti
       [badge, spec({ name: "w4", anatomy: [{ name: "root", element: "div" }, { name: "b", component: "badge", slotFill: { nope: { kind: "text", value: "x" } } }] })],
       [badge, spec({ name: "w5", anatomy: [{ name: "root", element: "div" }, { name: "b", component: "badge" }] })],
       [badge, spec({ name: "w6", anatomy: [{ name: "root", element: "div" }, { name: "b", component: "badge", slotFill: { content: { kind: "contextRef", field: "z" } } }] })],
+      [badge, spec({ name: "w7", anatomy: [{ name: "root", element: "div" }, { name: "b", component: "badge", onChildEvent: { NOPE: "EV" } }] })],
+      [badge, spec({ name: "w8", anatomy: [{ name: "root", element: "div" }, { name: "b", component: "badge", onChildEvent: { EV: "NOPE" } }] })],
     ];
     const allMessages = new Set<string>();
     for (const specs of cases) {
@@ -152,6 +178,8 @@ describe("verify-composition — six ways to break composition produce six disti
         "slot-fill-unknown-key",
         "slot-fill-missing-required",
         "slot-fill-context-ref-exists",
+        "child-event-unknown-key",
+        "child-event-target-unknown",
       ]),
     );
     const totalMessages = [...messagesByRule.values()].reduce((n, s) => n + s.size, 0);

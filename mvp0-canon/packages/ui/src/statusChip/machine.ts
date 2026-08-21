@@ -17,14 +17,17 @@ export const statusChipMachine = createMachine({
   states: {
     default: {
       on: {
-        HIGHLIGHT: { target: "highlighted" },
+        CLICK: { target: "highlighted" },
       },
     },
     highlighted: {
       on: {
-        RESET: { target: "default" },
+        CLICK: { target: "default" },
       },
     },
+  },
+  watch({ prop, event }) {
+    prop("onEvent")?.(event.current());
   },
   implementations: {
 

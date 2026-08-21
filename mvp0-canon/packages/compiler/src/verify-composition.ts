@@ -20,6 +20,8 @@ export function collectCompositionIssues(registry: Map<string, DiscoveredSpec>):
     ...checkSlotFillUnknownKey(specs),
     ...checkSlotFillMissingRequired(specs),
     ...checkSlotFillContextRefExists(specs),
+    ...checkChildEventUnknownKey(specs),
+    ...checkChildEventTargetUnknown(specs),
   ];
 }
 
@@ -135,6 +137,50 @@ function checkSlotFillContextRefExists(specs: Map<string, ComponentSpec>): Verif
             rule: "slot-fill-context-ref-exists",
             path: `${name}.anatomy.${part.name}.slotFill.${slotName}.field`,
             message: `slotFill.${slotName} references context field "${fill.field}", which isn't declared in "${name}"'s own context — declared context fields are: ${[...contextFields].join(", ") || "(none)"}.`,
+          });
+        }
+      }
+    }
+  }
+  return issues;
+}
+
+/** Rule: every onChildEvent key must be an event name the REFERENCED (nested) component actually declares. */
+function checkChildEventUnknownKey(specs: Map<string, ComponentSpec>): VerificationIssue[] {
+  const issues: VerificationIssue[] = [];
+  for (const [name, spec] of specs) {
+    for (const part of spec.anatomy) {
+      if (part.component === undefined || !part.onChildEvent) continue;
+      const referenced = specs.get(part.component);
+      if (!referenced) continue; // reported by checkComponentReferenceExists
+      const declaredEvents = new Set(referenced.events.map((e) => e.name));
+      for (const childEvent of Object.keys(part.onChildEvent)) {
+        if (!declaredEvents.has(childEvent)) {
+          issues.push({
+            rule: "child-event-unknown-key",
+            path: `${name}.anatomy.${part.name}.onChildEvent.${childEvent}`,
+            message: `onChildEvent key "${childEvent}" isn't an event declared by "${part.component}" — declared events are: ${[...declaredEvents].join(", ") || "(none)"}.`,
+          });
+        }
+      }
+    }
+  }
+  return issues;
+}
+
+/** Rule: every onChildEvent value must be an event name declared by the REFERENCING (parent) spec itself. */
+function checkChildEventTargetUnknown(specs: Map<string, ComponentSpec>): VerificationIssue[] {
+  const issues: VerificationIssue[] = [];
+  for (const [name, spec] of specs) {
+    const ownEvents = new Set(spec.events.map((e) => e.name));
+    for (const part of spec.anatomy) {
+      if (!part.onChildEvent) continue;
+      for (const [childEvent, parentEvent] of Object.entries(part.onChildEvent)) {
+        if (!ownEvents.has(parentEvent)) {
+          issues.push({
+            rule: "child-event-target-unknown",
+            path: `${name}.anatomy.${part.name}.onChildEvent.${childEvent}`,
+            message: `onChildEvent.${childEvent} targets event "${parentEvent}", which isn't declared in "${name}"'s own events — declared events are: ${[...ownEvents].join(", ") || "(none)"}.`,
           });
         }
       }

@@ -12,36 +12,18 @@ import { statusChipMachine } from "../../packages/ui/src/statusChip/machine";
 import { StatusChip, type StatusChipHandle } from "../../packages/ui/src/statusChip/statusChip";
 
 describe("StatusChip (generated) — valid transitions", () => {
-  it("[valid #0] default --HIGHLIGHT--> highlighted", async () => {
+  it("[valid #0] default --CLICK--> highlighted", async () => {
     const { result } = renderHook(() => useMachine(statusChipMachine, { successDuration: 500 } as any));
 
-    act(() => result.current.send({ type: "HIGHLIGHT" } as any));
+    act(() => result.current.send({ type: "CLICK" } as any));
     await waitFor(() => expect(result.current.state.matches("highlighted" as any)).toBe(true));
   });
 
-  it("[valid #1] highlighted --RESET--> default", async () => {
+  it("[valid #1] highlighted --CLICK--> default", async () => {
     const { result } = renderHook(() => useMachine(statusChipMachine, { successDuration: 500 } as any));
-      act(() => result.current.send({ type: "HIGHLIGHT" } as any));
-    act(() => result.current.send({ type: "RESET" } as any));
+      act(() => result.current.send({ type: "CLICK" } as any));
+    act(() => result.current.send({ type: "CLICK" } as any));
     await waitFor(() => expect(result.current.state.matches("default" as any)).toBe(true));
-  });
-});
-
-describe("StatusChip (generated) — invalid transitions are no-ops", () => {
-  it("[invalid] RESET in default is a no-op", async () => {
-    const { result } = renderHook(() => useMachine(statusChipMachine, { successDuration: 5000 } as any));
-
-    act(() => result.current.send({ type: "RESET" } as any));
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(result.current.state.matches("default" as any)).toBe(true);
-  });
-
-  it("[invalid] HIGHLIGHT in highlighted is a no-op", async () => {
-    const { result } = renderHook(() => useMachine(statusChipMachine, { successDuration: 5000 } as any));
-      act(() => result.current.send({ type: "HIGHLIGHT" } as any));
-    act(() => result.current.send({ type: "HIGHLIGHT" } as any));
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(result.current.state.matches("highlighted" as any)).toBe(true);
   });
 });
 
@@ -60,7 +42,7 @@ describe("StatusChip (generated) — accessibility per state", () => {
     const ref = { current: null as StatusChipHandle | null };
     const { container } = render(<StatusChip ref={ref} content={"content"} />);
     await waitFor(() => expect(ref.current).not.toBeNull());
-    act(() => ref.current?.send({ type: "HIGHLIGHT" } as any));
+    act(() => ref.current?.send({ type: "CLICK" } as any));
     await waitFor(() => expect(container.querySelector("[data-state=\"highlighted\"]")).not.toBeNull());
     const results = await axe(container);
     expect(results).toHaveNoViolations();

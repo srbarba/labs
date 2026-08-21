@@ -20,6 +20,8 @@ export interface ActionButtonProps {
   successDuration?: number;
   /** Fires whenever the underlying state changes — the extension point business logic (e.g. wiring an async action) hooks into, since the spec has no way to express "call this callback and feed its result back as an event." */
   onStateChange?: (state: ActionButtonSchema["state"]) => void;
+  /** Fires with the raw event object whenever this component's machine processes ANY event — the general escape hatch a composing parent's onChildEvent wiring uses to react to this component's own events without relying on DOM bubbling. */
+  onEvent?: (event: { type: string } & Record<string, any>) => void;
 }
 
 export interface ActionButtonHandle {
@@ -27,8 +29,8 @@ export interface ActionButtonHandle {
 }
 
 export const ActionButton = forwardRef<ActionButtonHandle, ActionButtonProps>(function ActionButton(props, ref) {
-  const { children, disabled, successDuration, onStateChange } = props;
-  const service = useMachine(actionButtonMachine, { disabled, successDuration } as Partial<ActionButtonSchema["props"]>);
+  const { children, disabled, successDuration, onStateChange, onEvent } = props;
+  const service = useMachine(actionButtonMachine, { disabled, successDuration, onEvent } as Partial<ActionButtonSchema["props"]>);
 
   useImperativeHandle(ref, () => ({ send: service.send }), [service]);
 
@@ -57,7 +59,10 @@ export const ActionButton = forwardRef<ActionButtonHandle, ActionButtonProps>(fu
       data-state={state}
       aria-busy={state === "pending"}
       disabled={state === "disabled"}
-      onClick={() => service.send({ type: "CLICK" } as ActionButtonSchema["event"])}
+      onClick={(event) => {
+        event.stopPropagation();
+        service.send({ type: "CLICK" } as ActionButtonSchema["event"]);
+      }}
       onKeyDown={handleKeyDown}
     >
       <span className={classes.label}>{children}</span>
