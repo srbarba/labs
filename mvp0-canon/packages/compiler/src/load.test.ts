@@ -172,3 +172,81 @@ describe("ComponentSpec schema — anatomy composition (element vs. component, c
     expect(result.success).toBe(false);
   });
 });
+
+describe("ComponentSpec schema — a component's own state (textBinding, onClick, transition action)", () => {
+  it("accepts a transition with a context action", () => {
+    const spec = {
+      ...validExample,
+      context: [{ name: "count", type: "number", default: 0 }],
+      transitions: [
+        ...validExample.transitions,
+        { from: "off", event: "BUMP", to: "off", action: { field: "count", op: "increment" } },
+      ],
+      events: [...validExample.events, { name: "BUMP" }],
+    };
+    const result = ComponentSpec.safeParse(spec);
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a context action with an unknown op", () => {
+    const spec = {
+      ...validExample,
+      context: [{ name: "count", type: "number", default: 0 }],
+      transitions: [
+        { from: "off", event: "BUMP", to: "off", action: { field: "count", op: "double" } },
+      ],
+    };
+    const result = ComponentSpec.safeParse(spec);
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts a native part with textBinding", () => {
+    const spec = {
+      ...validExample,
+      context: [{ name: "count", type: "number", default: 0 }],
+      anatomy: [...validExample.anatomy, { name: "display", element: "span", textBinding: "count" }],
+    };
+    const result = ComponentSpec.safeParse(spec);
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects textBinding on a part that has component instead of element", () => {
+    const spec = {
+      ...validExample,
+      anatomy: [validExample.anatomy[0], { name: "badge", component: "statusChip", textBinding: "count" }],
+    };
+    const result = ComponentSpec.safeParse(spec);
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a part declaring both contentSlot and textBinding", () => {
+    const spec = {
+      ...validExample,
+      context: [{ name: "count", type: "number", default: 0 }],
+      anatomy: [
+        ...validExample.anatomy,
+        { name: "display", element: "span", contentSlot: { required: true }, textBinding: "count" },
+      ],
+    };
+    const result = ComponentSpec.safeParse(spec);
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts onClick on a non-root native part", () => {
+    const spec = {
+      ...validExample,
+      anatomy: [...validExample.anatomy, { name: "extra", element: "button", onClick: "TOGGLE" }],
+    };
+    const result = ComponentSpec.safeParse(spec);
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects onClick declared on the root part", () => {
+    const spec = {
+      ...validExample,
+      anatomy: [{ name: "root", element: "button", onClick: "TOGGLE" }],
+    };
+    const result = ComponentSpec.safeParse(spec);
+    expect(result.success).toBe(false);
+  });
+});

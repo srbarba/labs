@@ -21,5 +21,10 @@ export function guardName(expression: string): string {
   return negated ? `not${pascalCase(field)}` : field;
 }
 
+/** Action implementation key for a transition's context mutation, e.g. {field:"count",op:"increment"} -> "incrementCount". */
+export function contextActionName(action: { field: string; op: "increment" | "decrement" }): string {
+  return `${action.op}${pascalCase(action.field)}`;
+}
+
 export const GENERATED_HEADER = (sourcePath: string): string =>
   `// GENERATED — DO NOT EDIT. Source: ${sourcePath}\n`;

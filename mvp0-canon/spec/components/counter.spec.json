@@ -1,0 +1,40 @@
+{
+  "name": "counter",
+  "version": "0.1.0",
+  "anatomy": [
+    { "name": "root", "element": "div", "role": "group" },
+    { "name": "decrement", "element": "button", "onClick": "DECREMENT", "contentSlot": { "required": true } },
+    { "name": "display", "element": "span", "textBinding": "count" },
+    { "name": "increment", "element": "button", "onClick": "INCREMENT", "contentSlot": { "required": true } }
+  ],
+  "states": [
+    { "name": "active", "description": "Único estado: el contador siempre está listo para incrementar o decrementar", "initial": true }
+  ],
+  "transitions": [
+    { "from": "active", "event": "INCREMENT", "to": "active", "action": { "field": "count", "op": "increment" } },
+    { "from": "active", "event": "DECREMENT", "to": "active", "action": { "field": "count", "op": "decrement" } }
+  ],
+  "events": [
+    { "name": "INCREMENT" },
+    { "name": "DECREMENT" }
+  ],
+  "context": [
+    { "name": "count", "type": "number", "default": 0 }
+  ],
+  "visual": {
+    "active": {
+      "root": { "backgroundColor": "color.counter.active.bg", "borderColor": "color.counter.active.border" },
+      "decrement": { "backgroundColor": "color.counter.active.buttonBg", "color": "color.counter.active.buttonFg" },
+      "display": { "color": "color.counter.active.fg" },
+      "increment": { "backgroundColor": "color.counter.active.buttonBg", "color": "color.counter.active.buttonFg" }
+    }
+  },
+  "a11y": {
+    "role": "group",
+    "ariaLive": "polite",
+    "focusBehaviour": {
+      "active": "retain"
+    },
+    "keyboard": {}
+  }
+}

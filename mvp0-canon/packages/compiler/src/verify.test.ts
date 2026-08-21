@@ -124,6 +124,70 @@ describe("verifyCompleteness — five ways to break the spec produce five distin
     }
   });
 
+  it("rule 7: a transition action referencing an undeclared context field fails with rule transition-action-field-exists", () => {
+    const broken: ComponentSpec = {
+      ...validSpec,
+      context: [{ name: "count", type: "number", default: 0 }],
+      transitions: [...validSpec.transitions, { from: "off", event: "BUMP", to: "off", action: { field: "bogus", op: "increment" } }],
+      events: [...validSpec.events, { name: "BUMP" }],
+    };
+    try {
+      verifyCompleteness(broken, tokens());
+      throw new Error("expected verifyCompleteness to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(VerificationError);
+      const err = error as VerificationError;
+      expect(err.issues.some((i) => i.rule === "transition-action-field-exists" && i.message.includes("bogus"))).toBe(true);
+    }
+  });
+
+  it("rule 8: a transition action targeting a non-number context field fails with rule transition-action-field-exists", () => {
+    const broken: ComponentSpec = {
+      ...validSpec,
+      context: [{ name: "locked", type: "boolean", default: false }],
+      transitions: [...validSpec.transitions, { from: "off", event: "BUMP", to: "off", action: { field: "locked", op: "increment" } }],
+      events: [...validSpec.events, { name: "BUMP" }],
+    };
+    try {
+      verifyCompleteness(broken, tokens());
+      throw new Error("expected verifyCompleteness to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(VerificationError);
+      const err = error as VerificationError;
+      expect(err.issues.some((i) => i.rule === "transition-action-field-exists" && i.message.includes("boolean"))).toBe(true);
+    }
+  });
+
+  it("rule 9: a textBinding referencing an undeclared context field fails with rule text-binding-field-exists", () => {
+    const broken: ComponentSpec = {
+      ...validSpec,
+      anatomy: [...validSpec.anatomy, { name: "display", element: "span", textBinding: "bogus" }],
+    };
+    try {
+      verifyCompleteness(broken, tokens());
+      throw new Error("expected verifyCompleteness to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(VerificationError);
+      const err = error as VerificationError;
+      expect(err.issues.some((i) => i.rule === "text-binding-field-exists" && i.message.includes("bogus"))).toBe(true);
+    }
+  });
+
+  it("rule 10: a part's onClick referencing an undeclared event fails with rule part-click-event-exists", () => {
+    const broken: ComponentSpec = {
+      ...validSpec,
+      anatomy: [...validSpec.anatomy, { name: "extra", element: "button", onClick: "BOGUS" }],
+    };
+    try {
+      verifyCompleteness(broken, tokens());
+      throw new Error("expected verifyCompleteness to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(VerificationError);
+      const err = error as VerificationError;
+      expect(err.issues.some((i) => i.rule === "part-click-event-exists" && i.message.includes("BOGUS"))).toBe(true);
+    }
+  });
+
   it("all five broken specs produce genuinely different messages from each other", () => {
     const messages = new Set<string>();
     const cases: ComponentSpec[] = [

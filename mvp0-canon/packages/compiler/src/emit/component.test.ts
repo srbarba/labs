@@ -131,3 +131,42 @@ describe("emitComponent — anatomy composition and content-projection slots", (
     expect(source).not.toContain('disabled={state ===');
   });
 });
+
+describe("emitComponent — a component's own live state (textBinding, per-part onClick)", () => {
+  it("a textBinding part renders the machine's own resolved context value as text", () => {
+    const source = emitAndRead(
+      spec({
+        context: [{ name: "count", type: "number", default: 0 }],
+        anatomy: [{ name: "root", element: "div" }, { name: "display", element: "span", textBinding: "count" }],
+      }),
+    );
+    expect(source).toContain('<span className={classes.display}>{String(service.context.get("count"))}</span>');
+  });
+
+  it("a non-root part with onClick dispatches its own declared event, isolated by stopPropagation", () => {
+    const source = emitAndRead(
+      spec({
+        events: [{ name: "EV" }, { name: "BUMP" }],
+        anatomy: [{ name: "root", element: "div" }, { name: "plus", element: "button", onClick: "BUMP" }],
+      }),
+    );
+    expect(source).toContain('type="button"');
+    expect(source).toContain("event.stopPropagation();");
+    expect(source).toContain('service.send({ type: "BUMP" } as WidgetSchema["event"]);');
+  });
+
+  it("two independently-clickable parts each dispatch their own event", () => {
+    const source = emitAndRead(
+      spec({
+        events: [{ name: "EV" }, { name: "INC" }, { name: "DEC" }],
+        anatomy: [
+          { name: "root", element: "div" },
+          { name: "minus", element: "button", onClick: "DEC" },
+          { name: "plus", element: "button", onClick: "INC" },
+        ],
+      }),
+    );
+    expect(source).toContain('type: "INC"');
+    expect(source).toContain('type: "DEC"');
+  });
+});

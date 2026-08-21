@@ -41,6 +41,19 @@ const SlotFillValue = z.discriminatedUnion("kind", [
  * delivered through a machine-level hook (see emit/machine.ts's `watch`),
  * not the DOM, so it works whether or not the nested markup happens to be
  * a DOM descendant of anything that would otherwise catch a bubbled click.
+ *
+ * `onClick` is the general mechanism for a native part *other than* `root`
+ * to dispatch one of this spec's own declared events on click — `root`
+ * keeps its own separate, older convention (a bare `CLICK` event wired
+ * automatically whenever the spec declares one; see emit/component.ts).
+ * Needed once a component has more than one independently-clickable part
+ * (e.g. two buttons), which `root`'s single implicit handler can't express.
+ *
+ * `textBinding` marks a native part's rendered content as the live,
+ * stringified value of one of this spec's own `context` fields — the
+ * general mechanism for a component to display its own state, as opposed
+ * to `contentSlot` (content decided by the caller) or `slotFill`'s
+ * `contextRef` (this spec's context forwarded into a NESTED component).
  */
 const AnatomyPart = z
   .object({
@@ -51,6 +64,8 @@ const AnatomyPart = z
     contentSlot: z.object({ required: z.boolean().optional().default(true) }).optional(),
     slotFill: z.record(identifier, SlotFillValue).optional(),
     onChildEvent: z.record(z.string().min(1), z.string().min(1)).optional(),
+    onClick: z.string().min(1).optional(),
+    textBinding: identifier.optional(),
   })
   .strict()
   .superRefine((part, ctx) => {
@@ -86,6 +101,27 @@ const AnatomyPart = z
         message: `anatomy part "${part.name}" cannot be both a component reference and a declared contentSlot — nested-slot forwarding isn't supported.`,
       });
     }
+    if (hasComponent && part.textBinding !== undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["textBinding"],
+        message: `anatomy part "${part.name}" declares textBinding but has a "component" reference — textBinding only applies to native parts.`,
+      });
+    }
+    if (part.contentSlot !== undefined && part.textBinding !== undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["textBinding"],
+        message: `anatomy part "${part.name}" declares both contentSlot and textBinding — a part's content can only come from one source.`,
+      });
+    }
+    if (part.name === "root" && part.onClick !== undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["onClick"],
+        message: `anatomy part "root" cannot declare onClick — root uses the implicit CLICK-on-click convention instead (see emit/component.ts).`,
+      });
+    }
   });
 
 const StateDef = z.object({
@@ -95,12 +131,29 @@ const StateDef = z.object({
   final: z.boolean().optional().default(false),
 });
 
+/**
+ * A transition-level mutation of one of this spec's own numeric `context`
+ * fields — kept as plain data (a field reference plus one of two fixed
+ * operations), never a function, matching this file's own rule that a spec
+ * is data, not code. This is what lets a transition (e.g. a self-loop like
+ * `active --INCREMENT--> active`) do more than just move between named
+ * states: context so far could only be read (by a `guard`) or set once at
+ * construction — never written by an event.
+ */
+const ContextAction = z
+  .object({
+    field: identifier,
+    op: z.enum(["increment", "decrement"]),
+  })
+  .strict();
+
 const TransitionDef = z.object({
   from: identifier,
   event: z.string().min(1),
   to: identifier,
   guard: z.string().optional(),
   delay: z.string().optional(),
+  action: ContextAction.optional(),
 });
 
 const EventDef = z.object({
@@ -151,3 +204,4 @@ export type AnatomyPart = z.infer<typeof AnatomyPart>;
 export type EventDef = z.infer<typeof EventDef>;
 export type ContextField = z.infer<typeof ContextField>;
 export type SlotFillValue = z.infer<typeof SlotFillValue>;
+export type ContextAction = z.infer<typeof ContextAction>;

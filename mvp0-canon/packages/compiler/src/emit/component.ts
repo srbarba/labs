@@ -33,7 +33,8 @@ export function emitComponent(spec: ComponentSpec, outDir: string, filePath: str
     );
   }
   const indicatorPart = spec.anatomy.find((p) => p.name === "indicator" && p.element !== undefined);
-  const liveRegionPart = indicatorPart ?? rootPart;
+  const textBindingPart = spec.anatomy.find((p) => p.textBinding !== undefined);
+  const liveRegionPart = indicatorPart ?? textBindingPart ?? rootPart;
 
   // Legacy convention, preserved only so pre-existing specs (action-button)
   // don't need to change: an anatomy part literally named "label" with no
@@ -90,9 +91,28 @@ export function emitComponent(spec: ComponentSpec, outDir: string, filePath: str
         return `      <${nestedComponentName}${fillProps ? ` ${fillProps}` : ""}${onEventProp} />`;
       }
       const liveAttr = part.name === liveRegionPart.name && spec.a11y.ariaLive ? ` aria-live=${JSON.stringify(spec.a11y.ariaLive)}` : "";
-      // contentSlot is the general mechanism; the "label"-name convention is a legacy fallback kept for pre-existing specs (see legacyLabelPart above).
-      const children = part.contentSlot !== undefined ? `{props.${part.name}}` : part.name === "label" && legacyLabelPart ? "{children}" : "";
-      return `      <${part.element} className={classes.${part.name}}${liveAttr}>${children}</${part.element}>`;
+      const typeAttr = part.element === "button" ? ' type="button"' : "";
+      // The general per-part click mechanism (see AnatomyPart.onClick in the
+      // schema) — needed once a component has more than one independently
+      // clickable part, which root's own implicit CLICK handler can't
+      // express. stopPropagation matches root's own onClick below, for the
+      // same reason (isolates this click from an ancestor this component
+      // might be nested inside).
+      const onClickAttr = part.onClick
+        ? ` onClick={(event) => {\n        event.stopPropagation();\n        service.send({ type: ${JSON.stringify(part.onClick)} } as ${componentName}Schema["event"]);\n      }}`
+        : "";
+      // contentSlot is the general mechanism for caller-provided content;
+      // textBinding renders this spec's OWN live context value instead; the
+      // "label"-name convention is a legacy fallback kept for pre-existing specs.
+      const children =
+        part.contentSlot !== undefined
+          ? `{props.${part.name}}`
+          : part.textBinding !== undefined
+            ? `{String(service.context.get(${JSON.stringify(part.textBinding)}))}`
+            : part.name === "label" && legacyLabelPart
+              ? "{children}"
+              : "";
+      return `      <${part.element}${typeAttr} className={classes.${part.name}}${liveAttr}${onClickAttr}>${children}</${part.element}>`;
     })
     .join("\n");
 

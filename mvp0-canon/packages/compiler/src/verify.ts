@@ -33,6 +33,9 @@ export function collectCompletenessIssues(spec: ComponentSpec, _tokens: Record<s
     ...checkDeadEnds(spec),
     ...checkKeyboardEvents(spec),
     ...checkFocusBehaviour(spec),
+    ...checkTransitionActionFields(spec),
+    ...checkTextBindingFields(spec),
+    ...checkPartClickEvents(spec),
   ];
 }
 
@@ -134,6 +137,62 @@ function checkKeyboardEvents(spec: ComponentSpec): VerificationIssue[] {
         rule: "keyboard-event",
         path: `a11y.keyboard.${key}`,
         message: `keyboard mapping "${key}" -> "${eventName}" references an event that isn't declared in events[] — declared events are: ${[...eventNames].join(", ")}.`,
+      });
+    }
+  }
+  return issues;
+}
+
+/** Rule: a transition's `action.field` must reference a declared, numeric context field — increment/decrement is only meaningful on a number. */
+function checkTransitionActionFields(spec: ComponentSpec): VerificationIssue[] {
+  const issues: VerificationIssue[] = [];
+  spec.transitions.forEach((transition, index) => {
+    if (!transition.action) return;
+    const field = spec.context.find((c) => c.name === transition.action!.field);
+    if (!field) {
+      issues.push({
+        rule: "transition-action-field-exists",
+        path: `transitions[${index}].action.field`,
+        message: `transition's action references context field "${transition.action.field}", which isn't declared in context[] — declared fields are: ${spec.context.map((c) => c.name).join(", ") || "(none)"}.`,
+      });
+    } else if (field.type !== "number") {
+      issues.push({
+        rule: "transition-action-field-exists",
+        path: `transitions[${index}].action.field`,
+        message: `transition's action (${transition.action.op}) targets context field "${field.name}", which is type "${field.type}" — increment/decrement only apply to a "number" field.`,
+      });
+    }
+  });
+  return issues;
+}
+
+/** Rule: an anatomy part's `textBinding` must reference a declared context field. */
+function checkTextBindingFields(spec: ComponentSpec): VerificationIssue[] {
+  const issues: VerificationIssue[] = [];
+  for (const part of spec.anatomy) {
+    if (part.textBinding === undefined) continue;
+    if (!spec.context.some((c) => c.name === part.textBinding)) {
+      issues.push({
+        rule: "text-binding-field-exists",
+        path: `anatomy.${part.name}.textBinding`,
+        message: `part "${part.name}" binds to context field "${part.textBinding}", which isn't declared in context[] — declared fields are: ${spec.context.map((c) => c.name).join(", ") || "(none)"}.`,
+      });
+    }
+  }
+  return issues;
+}
+
+/** Rule: an anatomy part's `onClick` must reference a declared event. */
+function checkPartClickEvents(spec: ComponentSpec): VerificationIssue[] {
+  const eventNames = new Set(spec.events.map((e) => e.name));
+  const issues: VerificationIssue[] = [];
+  for (const part of spec.anatomy) {
+    if (part.onClick === undefined) continue;
+    if (!eventNames.has(part.onClick)) {
+      issues.push({
+        rule: "part-click-event-exists",
+        path: `anatomy.${part.name}.onClick`,
+        message: `part "${part.name}" declares onClick "${part.onClick}", which isn't declared in events[] — declared events are: ${[...eventNames].join(", ") || "(none)"}.`,
       });
     }
   }

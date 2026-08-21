@@ -112,6 +112,25 @@ export const notificationButtonTokens = {
           "value": "#78350f"
         }
       }
+    },
+    "counter": {
+      "active": {
+        "bg": {
+          "value": "#ffffff"
+        },
+        "border": {
+          "value": "#d1d5db"
+        },
+        "fg": {
+          "value": "#111827"
+        },
+        "buttonBg": {
+          "value": "#2563eb"
+        },
+        "buttonFg": {
+          "value": "#ffffff"
+        }
+      }
     }
   },
   "radii": {
@@ -123,6 +142,9 @@ export const notificationButtonTokens = {
     },
     "statusChip": {
       "value": "9999px"
+    },
+    "counter": {
+      "value": "8px"
     }
   },
   "spacing": {
@@ -158,6 +180,17 @@ export const notificationButtonTokens = {
       "gap": {
         "value": "4px"
       }
+    },
+    "counter": {
+      "paddingX": {
+        "value": "12px"
+      },
+      "paddingY": {
+        "value": "8px"
+      },
+      "gap": {
+        "value": "12px"
+      }
     }
   },
   "fontSizes": {
@@ -169,6 +202,9 @@ export const notificationButtonTokens = {
     },
     "statusChip": {
       "value": "12px"
+    },
+    "counter": {
+      "value": "16px"
     }
   }
 } as const;

@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { ComponentSpec } from "../../../../spec/schema/component.schema.js";
-import { GENERATED_HEADER, guardName, pascalCase, timeoutEffectName, timeoutEventName } from "../naming.js";
+import { GENERATED_HEADER, contextActionName, guardName, pascalCase, timeoutEffectName, timeoutEventName } from "../naming.js";
 
 function tsLiteral(value: string | number | boolean): string {
   return typeof value === "string" ? JSON.stringify(value) : String(value);
@@ -30,6 +30,9 @@ function emitTypes(spec: ComponentSpec, filePath: string): string {
   const effectNames = [...new Set(delayedTransitions(spec).map((t) => timeoutEffectName(t.from)))];
   const effectUnion = effectNames.length > 0 ? effectNames.map((e) => JSON.stringify(e)).join(" | ") : "never";
 
+  const actionNames = [...new Set(spec.transitions.filter((t) => t.action).map((t) => contextActionName(t.action!)))];
+  const actionUnion = actionNames.length > 0 ? actionNames.map((a) => JSON.stringify(a)).join(" | ") : "never";
+
   const contextFields = spec.context.map((c) => `    ${c.name}: ${tsType(c.type)};`).join("\n");
   const propsFields = spec.context.map((c) => `    ${c.name}?: ${tsType(c.type)};`).join("\n");
 
@@ -52,7 +55,7 @@ ${contextFields}
   state: ${stateUnion};
   tag: never;
   guard: ${guardUnion};
-  action: never;
+  action: ${actionUnion};
   effect: ${effectUnion};
   event:
   | ${eventUnion};
@@ -79,7 +82,8 @@ function emitMachineSource(spec: ComponentSpec, filePath: string): string {
       const outgoing = spec.transitions.filter((t) => t.from === state.name && t.event !== "AFTER");
       const onLines = outgoing.map((t) => {
         const guard = t.guard ? `, guard: ${JSON.stringify(guardName(t.guard))}` : "";
-        return `        ${t.event}: { target: ${JSON.stringify(t.to)}${guard} },`;
+        const actions = t.action ? `, actions: [${JSON.stringify(contextActionName(t.action))}]` : "";
+        return `        ${t.event}: { target: ${JSON.stringify(t.to)}${guard}${actions} },`;
       });
 
       const delayedOut = delayedByFrom.get(state.name);
@@ -115,9 +119,19 @@ function emitMachineSource(spec: ComponentSpec, filePath: string): string {
     })
     .join("\n");
 
+  const actionNames = [...new Set(spec.transitions.filter((t) => t.action).map((t) => contextActionName(t.action!)))];
+  const actionImpls = actionNames
+    .map((name) => {
+      const action = spec.transitions.find((t) => t.action && contextActionName(t.action) === name)!.action!;
+      const delta = action.op === "increment" ? "+ 1" : "- 1";
+      return `      ${name}: ({ context }) => context.set(${JSON.stringify(action.field)}, (prev) => prev ${delta}),`;
+    })
+    .join("\n");
+
   const implementationsBlock = [
     guardNames.length > 0 ? `    guards: {\n${guardImpls}\n    },` : "",
     delayed.length > 0 ? `    effects: {\n${effectImpls}\n    },` : "",
+    actionNames.length > 0 ? `    actions: {\n${actionImpls}\n    },` : "",
   ]
     .filter(Boolean)
     .join("\n");

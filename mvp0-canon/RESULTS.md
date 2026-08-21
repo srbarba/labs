@@ -67,6 +67,41 @@ Lo que falsaría la hipótesis (sección 1) **no ocurrió**: la spec (90 líneas
 
 Dicho eso, el "no cupo" de arriba es sustancial y no cosmético: el enum de propiedades visuales, el cableado de acciones async, y la distinción construcción-vs-interacción son las tres fronteras reales del modelo actual. Para un MVP 1 con un segundo componente, la pregunta que más vale la pena hacer no es "¿generalizamos el compilador?" sino "¿estas tres fronteras aparecen otra vez con formas distintas, o son artefactos de que `ActionButton` es, específicamente, un botón asíncrono?" — si un segundo componente sin estado async y sin layout inusual no topa con ninguna de las tres, eso sería una señal fuerte de que el modelo generaliza más de lo que este único caso sugiere.
 
+## MVP 2 — Un componente con estado propio: `Counter` (rama `claude/counter-component-mvp-omi04e`)
+
+> Ver `METRICS.md` para el detalle completo (diseño, hallazgos, falsación); este apartado consolida el veredicto. `action-button.spec.json`, `status-chip.spec.json` y `notification-button.spec.json` no se tocan — la validación se hace con un cuarto componente nuevo, `counter`: dos botones (`+`/`-`) y un texto que muestra el contador.
+
+### La pregunta que se puso a prueba
+
+MVP 0 y MVP 1 modelan "estado" como un enum de estados nombrados, movido por eventos externos (`CLICK`, `RESOLVE`...) — el `context` solo se leía (`guard`) o se reenviaba ya resuelto a un componente anidado (`slotFill.contextRef`), nunca se escribía desde un evento propio ni se mostraba a sí mismo. Un `Counter` — cuyo "estado" es literalmente un número que sus propios botones mutan y su propio texto muestra — pone a prueba si eso cabe en el canon tal cual quedó tras MVP 1.
+
+### Las tres capacidades pedidas, y cómo se validó cada una
+
+| # | Capacidad | Cómo se validó | Resultado |
+|---|---|---|---|
+| 1 | Un evento propio muta un campo de contexto numérico | `TransitionDef.action: {field, op}` (dato, no función) genera `actions: ["incrementCount"]` en la transición y `context.set(field, prev => prev±1)` en `implementations.actions` — una API de `@zag-js/core` ya presente pero nunca antes cableada por el compilador | ✅ Verificado por 5 tests escritos a mano que aserta el dígito renderizado tras el clic (`test/generated/counter-composition.test.tsx`), no solo por el estado nombrado |
+| 2 | El propio componente muestra su valor vivo, no contenido pasado por quien lo usa | `AnatomyPart.textBinding` — renderiza `{String(service.context.get(field))}`, el mismo patrón ya probado en MVP 1 para `contextRef` | ✅ Compila, testea y buildea en Storybook |
+| 3 | Más de una parte de la anatomía, independientemente clicable | `AnatomyPart.onClick` (nuevo mecanismo general, solo en partes que no son `root`) — cada parte envía su propio evento con `stopPropagation()`, aislada de las demás | ✅ `+` y `-` disparan `INCREMENT`/`DECREMENT` por separado; probado que un click en un botón no burbujea a un ancestro |
+
+### Falsación (6 mutaciones reales, cada una revertida)
+
+| # | Mutación | Resultado |
+|---|---|---|
+| 1 | `action.field` no declarado en `context[]` | Rechazado — `transition-action-field-exists` |
+| 2 | `action` (`increment`) sobre un campo `boolean` | Rechazado — `transition-action-field-exists`, cita el tipo real |
+| 3 | `textBinding` no declarado en `context[]` | Rechazado — `text-binding-field-exists` |
+| 4 | `onClick` declarado en `root` | Rechazado por el esquema Zod |
+| 5 | `onClick` referencia un evento no declarado | Rechazado — `part-click-event-exists` |
+| 6 | Una parte con `textBinding` y `contentSlot` a la vez | Rechazado por el esquema Zod |
+
+### Qué no cupo (resumen — detalle completo en `METRICS.md`)
+
+El hallazgo más importante no es de diseño sino de cobertura: **el generador de tests solo sabe verificar en qué estado nombrado está la máquina, nunca el valor de su contexto** — para `active --INCREMENT--> active` (un self-loop, el único estado no cambia) el test generado pasa lo mande o no el evento, porque no tiene vocabulario para "y el contexto cambió". La mutación real solo queda probada por un fichero escrito a mano, exactamente el mismo patrón — "lo que la spec no modela vive fuera del árbol generado" — que MVP 0 y MVP 1 ya habían establecido para lógica de negocio async, aplicado aquí por primera vez a la semántica de una mutación de estado cuantitativo. Además: `op` solo admite incrementar/decrementar en 1 (sin paso configurable, sin `set`, sin clamping); `textBinding` no interpola texto alrededor del valor; y el problema de "un botón sin texto no tiene nombre accesible" se resolvió sin ningún mecanismo nuevo, reutilizando `contentSlot` (ya existente desde MVP 1) para el glifo del botón.
+
+### Veredicto
+
+**Go.** Las tres capacidades funcionan end-to-end: 14 tests unitarios nuevos del compiler (64/64), generación real de `Counter` compilando/testeando/buildeando junto a los 3 componentes existentes sin tocarlos, 5 tests de comportamiento escritos a mano que prueban la mutación real (no solo el estado nombrado), y 6 mutaciones reales contra el repositorio, todas rechazadas con mensajes distintos. El costo no estuvo en el mecanismo — una capacidad de Zag ya presente, dos campos de dato nuevos en el schema — sino en un límite estructural del propio método, expuesto aquí por primera vez: el canon puede generar y verificar automáticamente que un componente transiciona entre estados nombrados, pero no que un valor cuantitativo dentro de esos estados cambia como se espera; esa parte de la prueba tiene que escribirse a mano, con toda intención, fuera del árbol generado.
+
 ## MVP 1 — Composición de componentes y slots (rama `claude/nested-components-slots-mvp-6nsbbc`)
 
 > Fases A-F. Ver `METRICS.md` para el detalle fase a fase; este apartado consolida el veredicto. `action-button.spec.json` y `packages/ui-manual/` no se tocaron — la validación se hizo con dos componentes nuevos y mínimos (`statusChip`, `notificationButton`) para no arriesgar el veredicto de la Fase 9.

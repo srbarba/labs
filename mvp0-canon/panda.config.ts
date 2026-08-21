@@ -9,6 +9,8 @@ import { statusChipTokens } from "./packages/ui/src/statusChip/tokens";
 import { statusChipRecipe } from "./packages/ui/src/statusChip/recipe";
 import { notificationButtonTokens } from "./packages/ui/src/notificationButton/tokens";
 import { notificationButtonRecipe } from "./packages/ui/src/notificationButton/recipe";
+import { counterTokens } from "./packages/ui/src/counter/tokens";
+import { counterRecipe } from "./packages/ui/src/counter/recipe";
 
 /**
  * Hand-written app-level wiring — NOT generated. It stays editable across
@@ -46,12 +48,13 @@ export default defineConfig({
   outdir: "styled-system",
   theme: {
     extend: {
-      tokens: mergeTokenSets(actionButtonTokens, statusChipTokens, notificationButtonTokens),
+      tokens: mergeTokenSets(actionButtonTokens, statusChipTokens, notificationButtonTokens, counterTokens),
       slotRecipes: {
         actionButtonManual: actionButtonManualRecipe,
         actionButton: actionButtonRecipe,
         statusChip: statusChipRecipe,
         notificationButton: notificationButtonRecipe,
+        counter: counterRecipe,
       },
     },
   },
